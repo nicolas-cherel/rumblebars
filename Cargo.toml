@@ -1,0 +1,9 @@
+[package]
+
+name = "rumble-bars"
+version = "0.0.1"
+authors = ["Nicolas Cherel <nicolas.cherel@gmail.com>"]
+
+[dependencies.rustlex]
+# git = "https://github.com/LeoTestard/rustlex"
+git = "https://github.com/kali/rustlex"
