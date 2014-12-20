@@ -4,7 +4,8 @@
 
 use std::fmt;
 use std::io::BufReader;
-use self::Token::{TokSimpleExp, TokEscapedExp, TokBlockExp, TokBlockEndExp, TokRaw, TokPathStart,TokPathSep,TokPathEntry,TokNoWhiteSpace,TokStringParam,TokParamStart, TokParamSep, TokOption};
+use self::Token::{TokSimpleExp, TokEscapedExp, TokBlockExp, TokBlockEndExp, TokRaw};
+use self::HBToken::{TokPathStart,TokPathSep,TokPathEntry,TokNoWhiteSpace,TokStringParam,TokParamStart, TokParamSep, TokOption};
 
 #[deriving(Show)]
 enum Token {
@@ -14,8 +15,10 @@ enum Token {
   TokBlockExp(String),
   TokBlockEndExp(String),
   TokRaw(String),
+}
 
-  // handlebars expression tokens
+#[deriving(Show)]
+enum HBToken {
   TokPathStart,
   TokPathSep,
   TokPathEntry(String),
@@ -53,6 +56,7 @@ rustlex! HandleBarsLexer {
 
 
 rustlex! HBExpressionLexer {
+  token HBToken;
   property in_options:bool = false;
 
   let START = "{{" ['{''#''/']?;
@@ -307,8 +311,6 @@ pub fn parse(template: &str) -> Option<&Template> {
         stack.last_mut().unwrap().content.push(box HBEntry::Raw(raw));
         raw = String::new();
       },
-
-      _ => {}
     }
 
     // second match handle handlebars expressions
