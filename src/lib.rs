@@ -216,7 +216,7 @@ fn debug_parse_hb(exp: &str) {
 
 }
 
-fn parse_hb_expresion(exp: &str) -> Option<HBExpression> {
+fn parse_hb_expression(exp: &str) -> Option<HBExpression> {
   let mut lexer = HBExpressionLexer::new(BufReader::new(exp.as_bytes()));
 
   if let Some(tok) = lexer.next()  {
@@ -316,24 +316,24 @@ pub fn parse(template: &str) -> Option<&Template> {
     // second match handle handlebars expressions
     match tok {
       TokSimpleExp(exp) => {
-        if let Some(hb) = parse_hb_expresion(exp.as_slice()) {
+        if let Some(hb) = parse_hb_expression(exp.as_slice()) {
           stack.last_mut().unwrap().content.push(box HBEntry::Eval(hb))
         }
       },
       TokEscapedExp(exp) => {
-        if let Some(mut hb) = parse_hb_expresion(exp.as_slice()) {
+        if let Some(mut hb) = parse_hb_expression(exp.as_slice()) {
           hb.escape = true;
           stack.last_mut().unwrap().content.push(box HBEntry::Eval(hb))
         }
       },
       TokBlockExp(exp) => {
-        if let Some(hb) = parse_hb_expresion(exp.as_slice()) {
+        if let Some(hb) = parse_hb_expression(exp.as_slice()) {
           stack.last_mut().unwrap().content.push(box HBEntry::Eval(hb));
           stack.push(box Template { content: vec![] });
         }
       },
       TokBlockEndExp(exp) => {
-        if let Some(hb) = parse_hb_expresion(exp.as_slice()) {
+        if let Some(hb) = parse_hb_expression(exp.as_slice()) {
           let pop = stack.pop();
           match stack.last_mut().unwrap().content.last_mut() {
             Some(&box HBEntry::Eval(ref mut parent)) => {
