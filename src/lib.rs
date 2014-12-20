@@ -186,6 +186,7 @@ struct HBExpression {
   base: Vec<String>,
   params: Vec<HBValHolder>,
   options: Vec<(String, HBValHolder)>,
+  escape: bool,
   no_white_space: bool,
   block: Option<Box<Template>>
 }
@@ -280,7 +281,7 @@ fn parse_hb_expresion(exp: &str) -> Option<HBExpression> {
         }
 
         
-        return  Some(HBExpression { base: path, params: params, options: options, no_white_space: no_white_space, block: None })
+        return  Some(HBExpression { base: path, params: params, options: options, no_white_space: no_white_space, escape: false, block: None })
       },
       _ => { return None }
     }
@@ -318,7 +319,8 @@ pub fn parse(template: &str) -> Option<&Template> {
         }
       },
       TokEscapedExp(exp) => {
-        if let Some(hb) = parse_hb_expresion(exp.as_slice()) {
+        if let Some(mut hb) = parse_hb_expresion(exp.as_slice()) {
+          hb.escape = true;
           stack.last_mut().unwrap().content.push(box HBEntry::Eval(hb))
         }
       },
@@ -349,7 +351,7 @@ pub fn parse(template: &str) -> Option<&Template> {
     }
 
   }
-  
+
   return match stack.head() {
     Some(&box ref t) => Some(t),
     None => None,
