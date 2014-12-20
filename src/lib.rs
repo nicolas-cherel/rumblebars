@@ -149,7 +149,7 @@ rustlex! HBExpressionLexer {
 
 #[test]
 fn it_works() {
-  parse(r##"
+  println!("{}", parse(r##"
     conten content
     {{pouet.so1}}
     {{#pouet2}} do do do {{/pouet2}}
@@ -172,7 +172,7 @@ fn it_works() {
     {{{toto2 coyote=speed.runner hello=how tip="top"}}}
     {{{toto3.[3].[#jojo] titi="grominet"}}}
     {{t "… param1" well.[that my baby].[1] ~}}
-  "##)
+  "##))
 }
 
 #[deriving(Show)]
@@ -197,7 +197,7 @@ enum HBEntry {
 }
 
 #[deriving(Show)]
-struct Template {
+pub struct Template {
   content: Vec<Box<HBEntry>>
 }
 
@@ -293,7 +293,7 @@ fn parse_hb_expresion(exp: &str) -> Option<HBExpression> {
 }
 
 
-pub fn parse(template: &str) {
+pub fn parse(template: &str) -> Option<&Template> {
   let mut lexer = HandleBarsLexer::new(BufReader::new(template.as_bytes()));
   let mut raw = String::new();
   let mut stack = vec![box Template { content: vec![] }];
@@ -349,5 +349,9 @@ pub fn parse(template: &str) {
     }
 
   }
-  println!("{}", stack.head());
+  
+  return match stack.head() {
+    Some(&box ref t) => Some(t),
+    None => None,
+  };
 }
