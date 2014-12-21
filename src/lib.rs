@@ -187,7 +187,15 @@ fn debug_parse_hb(exp: &str) {
 
 }
 
-fn parse_hb_expression(exp: &str) -> Option<HBExpression> {
+pub enum ParseError {
+  UnkownError, // unknown as ‘still not diagnosed case’, not ’your grandma's TV is set on fire case’
+  UnmatchedBlock,
+  UnexpectedBlockClose,
+}
+
+impl Copy for ParseError {}
+
+fn parse_hb_expression(exp: &str) -> Result<HBExpression, ParseError> {
   let mut lexer = HBExpressionLexer::new(BufReader::new(exp.as_bytes()));
 
   if let Some(tok) = lexer.next()  {
@@ -256,20 +264,20 @@ fn parse_hb_expression(exp: &str) -> Option<HBExpression> {
         }
 
         
-        return  Some(HBExpression { base: path, params: params, options: options, no_white_space: no_white_space, escape: false, block: None })
+        return  Ok(HBExpression { base: path, params: params, options: options, no_white_space: no_white_space, escape: false, block: None })
       },
-      _ => { return None }
+      _ => { return Err(ParseError::UnkownError) }
     }
 
   } else {
-    return None
+    return Err(ParseError::UnkownError)
   }
 
   
 }
 
 
-pub fn parse(template: &str) -> Option<&Template> {
+pub fn parse(template: &str) -> Result<&Template, ParseError> {
   let mut lexer = HandleBarsLexer::new(BufReader::new(template.as_bytes()));
   let mut raw = String::new();
   let mut stack = vec![box Template { content: vec![] }];
@@ -287,24 +295,24 @@ pub fn parse(template: &str) -> Option<&Template> {
     // second match handle handlebars expressions
     match tok {
       TokSimpleExp(exp) => {
-        if let Some(hb) = parse_hb_expression(exp.as_slice()) {
+        if let Ok(hb) = parse_hb_expression(exp.as_slice()) {
           stack.last_mut().unwrap().content.push(box HBEntry::Eval(hb))
         }
       },
       TokEscapedExp(exp) => {
-        if let Some(mut hb) = parse_hb_expression(exp.as_slice()) {
+        if let Ok(mut hb) = parse_hb_expression(exp.as_slice()) {
           hb.escape = true;
           stack.last_mut().unwrap().content.push(box HBEntry::Eval(hb))
         }
       },
       TokBlockExp(exp) => {
-        if let Some(hb) = parse_hb_expression(exp.as_slice()) {
+        if let Ok(hb) = parse_hb_expression(exp.as_slice()) {
           stack.last_mut().unwrap().content.push(box HBEntry::Eval(hb));
           stack.push(box Template { content: vec![] });
         }
       },
       TokBlockEndExp(exp) => {
-        if let Some(hb) = parse_hb_expression(exp.as_slice()) {
+        if let Ok(hb) = parse_hb_expression(exp.as_slice()) {
           let pop = stack.pop();
           match stack.last_mut().unwrap().content.last_mut() {
             Some(&box HBEntry::Eval(ref mut parent)) => {
@@ -326,7 +334,7 @@ pub fn parse(template: &str) -> Option<&Template> {
   }
 
   return match stack.head() {
-    Some(&box ref t) => Some(t),
-    None => None,
+    Some(&box ref t) => Result::Ok(t),
+    None => Result::Err(ParseError::UnkownError),
   };
 }
