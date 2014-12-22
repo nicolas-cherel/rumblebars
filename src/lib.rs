@@ -187,6 +187,7 @@ fn debug_parse_hb(exp: &str) {
 
 }
 
+#[deriving(Show)]
 pub enum ParseError {
   UnkownError, // unknown as ‘still not diagnosed case’, not ’your grandma's TV is set on fire case’
   UnmatchedBlock,
@@ -195,7 +196,7 @@ pub enum ParseError {
 
 impl Copy for ParseError {}
 
-fn parse_hb_expression(exp: &str) -> Result<HBExpression, ParseError> {
+fn parse_hb_expression(exp: &str) -> Result<HBExpression, (ParseError, Option<String>)> {
   let mut lexer = HBExpressionLexer::new(BufReader::new(exp.as_bytes()));
 
   if let Some(tok) = lexer.next()  {
@@ -266,18 +267,18 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpression, ParseError> {
         
         return  Ok(HBExpression { base: path, params: params, options: options, no_white_space: no_white_space, escape: false, block: None })
       },
-      _ => { return Err(ParseError::UnkownError) }
+      _ => { return Err((ParseError::UnkownError, None)) }
     }
 
   } else {
-    return Err(ParseError::UnkownError)
+    return Err((ParseError::UnkownError, None))
   }
 
   
 }
 
 
-pub fn parse(template: &str) -> Result<&Template, ParseError> {
+pub fn parse(template: &str) -> Result<&Template, (ParseError, Option<String>)> {
   let mut lexer = HandleBarsLexer::new(BufReader::new(template.as_bytes()));
   let mut raw = String::new();
   let mut stack = vec![box Template { content: vec![] }];
@@ -319,10 +320,10 @@ pub fn parse(template: &str) -> Result<&Template, ParseError> {
               if parent.base == hb.base {
                 parent.block = pop;
               } else {
-                error!("{} does not match {}", parent.base, hb.base);
+                return Err((ParseError::UnmatchedBlock, Some(format!("‘{}’ does not match ‘{}’", hb.base, parent.base))))
               }
             }
-            _ => { error!("compile error, could not find block parent for {}", hb.base) } 
+            _ => { return Err((ParseError::UnexpectedBlockClose, Some(format!("‘{}’ does not close any block", hb.base)))) } 
           }
         }
       }
@@ -335,6 +336,6 @@ pub fn parse(template: &str) -> Result<&Template, ParseError> {
 
   return match stack.head() {
     Some(&box ref t) => Result::Ok(t),
-    None => Result::Err(ParseError::UnkownError),
+    None => Result::Err((ParseError::UnkownError, None)),
   };
 }
