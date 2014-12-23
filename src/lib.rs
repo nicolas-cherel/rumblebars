@@ -2,7 +2,6 @@
 #[phase(plugin,link)] extern crate rustlex;
 #[phase(plugin, link)] extern crate log;
 
-use std::fmt;
 use std::io::BufReader;
 use self::Token::{TokSimpleExp, TokEscapedExp, TokBlockExp, TokBlockEndExp, TokRaw};
 use self::HBToken::{TokPathStart,TokPathSep,TokPathEntry,TokNoWhiteSpace,TokStringParam,TokParamStart, TokParamSep, TokOption};
