@@ -6,6 +6,9 @@ use std::io::BufReader;
 use self::Token::{TokSimpleExp, TokEscapedExp, TokBlockExp, TokBlockEndExp, TokRaw};
 use self::HBToken::{TokPathStart,TokPathSep,TokPathEntry,TokNoWhiteSpace,TokStringParam,TokParamStart, TokParamSep, TokOption};
 
+// trigger test compilation in same unit
+mod test;
+
 #[deriving(Show)]
 enum Token {
   // base template tokens 
