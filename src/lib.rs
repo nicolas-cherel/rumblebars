@@ -2,7 +2,12 @@
 #[phase(plugin,link)] extern crate rustlex;
 #[phase(plugin, link)] extern crate log;
 
+extern crate serialize;
+
 use std::io::BufReader;
+use std::io::Writer;
+use serialize::json::Json;
+
 use self::Token::{TokSimpleExp, TokEscapedExp, TokBlockExp, TokBlockEndExp, TokRaw};
 use self::HBToken::{TokPathStart,TokPathSep,TokPathEntry,TokNoWhiteSpace,TokStringParam,TokParamStart, TokParamSep, TokOption};
 
@@ -341,3 +346,27 @@ pub fn parse(template: &str) -> Result<&Template, (ParseError, Option<String>)> 
     None => Result::Err((ParseError::UnkownError, None)),
   };
 }
+
+fn get_val_for_key<'a>(data: &'a Json, key_path: &Vec<String>) ->  Option<&'a Json> {
+  let mut ctxt = Some(data);
+  
+  for key in key_path.iter() {
+    let some_num_key = from_str(key.as_slice());
+    ctxt = match ctxt {
+      Some(&Json::Array(ref a)) => {
+        if let Some(num_key) = some_num_key {
+          a.get(num_key)
+        } else {
+          None
+        }
+      },
+      Some(&Json::Object(ref o)) => {
+        o.get(key)
+      },
+      _ => None, // keys only match against arrays and objects
+    }
+  }
+
+  return ctxt;
+}
+

@@ -1,12 +1,20 @@
 
 #[allow(unused_imports)] // disable warning since only used in tests
+use serialize::json;
+#[allow(unused_imports)]
+use serialize::json::{Json, decode};
+
+#[allow(unused_imports)]
 use parse;
-
-#[allow(unused_imports)] // disable warning since only used in tests
+#[allow(unused_imports)]
 use parse_hb_expression;
-
-#[allow(unused_imports)] // disable warning since only used in tests
+#[allow(unused_imports)]
 use ParseError;
+#[allow(unused_imports)]
+use get_val_for_key;
+
+
+
 
 #[test]
 fn it_works() {
@@ -80,3 +88,38 @@ fn fail_block() {
 fn fail_nested_block() {
   assert!(match parse("{{#o}}{{/i}}{{/o}}") { Err((ParseError::UnmatchedBlock, _)) => true, Err(_) => false, Ok(_) => false })
 }
+
+#[test]
+fn fetch_key_value() {
+  let json = json::from_str(r##"{"a": 1}"##).unwrap();
+  assert_eq!(match get_val_for_key(&json, &vec![String::from_str("a")]) {
+    Some(&Json::U64(a)) => a, 
+    _ => 10000
+  }, 1);
+}
+
+#[test]
+fn fetch_key_value_level1() {
+  let json = json::from_str(r##"{"a": {"b": 1}}"##).unwrap();
+  assert_eq!(1, match get_val_for_key(&json, &vec![String::from_str("a"), String::from_str("b")]) {
+    Some(&Json::U64(a)) => a, 
+    _ => 10000
+  });
+}
+
+#[test]
+fn fetch_key_value_array_level1() {
+  let json = json::from_str(r##"{"a": [1, 2, 3]}"##).unwrap();
+  assert_eq!(1, match get_val_for_key(&json, &vec![String::from_str("a"), String::from_str("0")]) {
+    Some(&Json::U64(a)) => a, 
+    _ => 10000
+  });
+}
+
+#[test]
+fn deep_path_none() {
+  let json = json::from_str(r##"{"a": 1}"##).unwrap();
+  assert_eq!(None, get_val_for_key(&json, &vec![String::from_str("a"), String::from_str("b")]));
+}
+
+
