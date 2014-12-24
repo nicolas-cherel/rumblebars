@@ -1,8 +1,12 @@
 
 #[allow(unused_imports)] // disable warning since only used in tests
+use std::str;
+#[allow(unused_imports)]
 use serialize::json;
 #[allow(unused_imports)]
 use serialize::json::{Json, decode};
+#[allow(unused_imports)]
+use std::io::BufWriter;
 
 #[allow(unused_imports)]
 use parse;
@@ -12,6 +16,8 @@ use parse_hb_expression;
 use ParseError;
 #[allow(unused_imports)]
 use get_val_for_key;
+#[allow(unused_imports)]
+use eval;
 
 
 
@@ -122,4 +128,62 @@ fn deep_path_none() {
   assert_eq!(None, get_val_for_key(&json, &vec![String::from_str("a"), String::from_str("b")]));
 }
 
+#[test]
+fn simple_render() {
+  let json = json::from_str(r##"{"p": "that poney has something sad in its eye"}"##).unwrap();
+  let tmpl = parse(r##"{{p}}"##).unwrap();
+  let mut buf = [0, ..1024];
 
+  {  
+    let mut w = BufWriter::new(&mut buf);
+    eval(tmpl, &json, &mut w);
+  }
+
+  let mut tt = [0, ..1024];
+  {
+    let mut w = BufWriter::new(&mut tt);
+    w.write_str("that poney has something sad in its eye");
+  }
+
+  assert_eq!(str::from_utf8(&buf).unwrap(), str::from_utf8(&buf).unwrap());
+}
+
+#[test]
+fn simple_render_with_raw() {
+  let json = json::from_str(r##"{"p": "that poney has something sad in its eye"}"##).unwrap();
+  let tmpl = parse(r##"prelude {{p}} post"##).unwrap();
+  let mut buf = [0, ..1024];
+
+  {  
+    let mut w = BufWriter::new(&mut buf);
+    eval(tmpl, &json, &mut w);
+  }
+
+  let mut tt = [0, ..1024];
+  {
+    let mut w = BufWriter::new(&mut tt);
+    w.write_str("prelude that poney has something sad in its eye post");
+  }
+
+  assert_eq!(str::from_utf8(&buf).unwrap(), str::from_utf8(&buf).unwrap());
+}
+
+#[test]
+fn simple_render_with_block() {
+    let json = json::from_str(r##"{"p": { "k": "that poney has something sad in its eye"}}"##).unwrap();
+  let tmpl = parse(r##"prelude {{#p}}{{k}}{{/p}} post"##).unwrap();
+  let mut buf = [0, ..1024];
+
+  {  
+    let mut w = BufWriter::new(&mut buf);
+    eval(tmpl, &json, &mut w);
+  }
+
+  let mut tt = [0, ..1024];
+  {
+    let mut w = BufWriter::new(&mut tt);
+    w.write_str("prelude that poney has something sad in its eye post");
+  }
+
+  assert_eq!(str::from_utf8(&buf).unwrap(), str::from_utf8(&buf).unwrap());
+}

@@ -370,3 +370,44 @@ fn get_val_for_key<'a>(data: &'a Json, key_path: &Vec<String>) ->  Option<&'a Js
   return ctxt;
 }
 
+pub fn eval(template: &Template, data: &Json, out: &mut Writer) {
+  let mut stack:Vec<_> = FromIterator::from_iter(template.content.iter().map(|e| {
+    (e, data)
+  }));
+
+  while let Some((templ, ctxt)) = stack.pop() {
+    match templ {
+      &box HBEntry::Raw(ref s) => { 
+        out.write_str(s.as_slice());
+      },
+      &box HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref escape, ref no_white_space, block: None}) => {
+        match get_val_for_key(ctxt, base) {
+          Some(v) => match(v) {
+            &Json::I64(ref i) => out.write_str(format!("{}", i).as_slice()),
+            &Json::U64(ref u) => out.write_str(format!("{}", u).as_slice()),
+            &Json::F64(ref f) => out.write_str(format!("{}", f).as_slice()),
+            &Json::String(ref s) => out.write_str(format!("{}", s).as_slice()),
+            &Json::Boolean(ref b) => out.write_str(format!("{}", b).as_slice()),
+            _ => Ok(()),
+          },
+          None => Ok(()),
+        };
+      },
+      
+      &box HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref escape, ref no_white_space, ref block}) => {
+        let c_ctxt = get_val_for_key(ctxt, base);
+        match (c_ctxt, block) {
+          (Some(c), &Some(ref t)) => {
+            for e in t.content.iter() {
+              stack.push((e, c));
+            }
+          },
+          _ => (),
+        };
+      },
+    }
+
+
+  }
+}
+
