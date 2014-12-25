@@ -295,8 +295,10 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
     match tok {
       TokRaw(ref chr) => raw.push_str(chr.as_slice()),
       TokSimpleExp(_) | TokEscapedExp(_) | TokBlockExp(_) | TokBlockEndExp(_) => {
-        stack.last_mut().unwrap().content.push(box HBEntry::Raw(raw));
-        raw = String::new();
+        if ! raw.is_empty() {
+          stack.last_mut().unwrap().content.push(box HBEntry::Raw(raw));
+          raw = String::new();
+        }
       },
     }
 
@@ -341,9 +343,9 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
 
   }
 
-  return match stack.head() {
-    Some(&box ref t) => Result::Ok(t),
-    None => Result::Err((ParseError::UnkownError, None)),
+  if ! raw.is_empty() {
+    stack.last_mut().unwrap().content.push(box HBEntry::Raw(raw));
+  }
 
   return match stack.remove(0) {
     Some(box t) => Result::Ok(t),
