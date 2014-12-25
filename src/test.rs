@@ -2,6 +2,8 @@
 #[allow(unused_imports)] // disable warning since only used in tests
 use std::str;
 #[allow(unused_imports)]
+use std::vec::Vec;
+#[allow(unused_imports)]
 use serialize::json;
 #[allow(unused_imports)]
 use serialize::json::{Json, decode};
@@ -14,6 +16,10 @@ use parse;
 use parse_hb_expression;
 #[allow(unused_imports)]
 use ParseError;
+#[allow(unused_imports)]
+use Template;
+#[allow(unused_imports)]
+use HBEntry;
 #[allow(unused_imports)]
 use get_val_for_key;
 #[allow(unused_imports)]
@@ -96,6 +102,15 @@ fn fail_nested_block() {
 }
 
 #[test]
+fn parse_raw() {
+  let p = parse("tada").unwrap();
+  assert_eq!("tada", match p.content.get(0) {
+    Some(&box HBEntry::Raw(ref s)) => s.as_slice(),
+    _ => "",
+  });
+}
+
+#[test]
 fn fetch_key_value() {
   let json = json::from_str(r##"{"a": 1}"##).unwrap();
   assert_eq!(match get_val_for_key(&json, &vec![String::from_str("a")]) {
@@ -132,58 +147,31 @@ fn deep_path_none() {
 fn simple_render() {
   let json = json::from_str(r##"{"p": "that poney has something sad in its eye"}"##).unwrap();
   let tmpl = parse(r##"{{p}}"##).unwrap();
-  let mut buf = [0, ..1024];
+  let mut buf: Vec<u8> = Vec::new();
 
-  {  
-    let mut w = BufWriter::new(&mut buf);
-    eval(tmpl, &json, &mut w);
-  }
+  eval(&tmpl, &json, &mut buf);
 
-  let mut tt = [0, ..1024];
-  {
-    let mut w = BufWriter::new(&mut tt);
-    w.write_str("that poney has something sad in its eye");
-  }
-
-  assert_eq!(str::from_utf8(&buf).unwrap(), str::from_utf8(&buf).unwrap());
+  assert_eq!(String::from_utf8(buf).unwrap(), String::from_str("that poney has something sad in its eye"));
 }
 
 #[test]
 fn simple_render_with_raw() {
   let json = json::from_str(r##"{"p": "that poney has something sad in its eye"}"##).unwrap();
   let tmpl = parse(r##"prelude {{p}} post"##).unwrap();
-  let mut buf = [0, ..1024];
+  let mut buf: Vec<u8> = Vec::new();
 
-  {  
-    let mut w = BufWriter::new(&mut buf);
-    eval(tmpl, &json, &mut w);
-  }
+  eval(&tmpl, &json, &mut buf);
 
-  let mut tt = [0, ..1024];
-  {
-    let mut w = BufWriter::new(&mut tt);
-    w.write_str("prelude that poney has something sad in its eye post");
-  }
-
-  assert_eq!(str::from_utf8(&buf).unwrap(), str::from_utf8(&buf).unwrap());
+  assert_eq!(String::from_utf8(buf).unwrap(), String::from_str("prelude that poney has something sad in its eye post"));
 }
 
 #[test]
 fn simple_render_with_block() {
-    let json = json::from_str(r##"{"p": { "k": "that poney has something sad in its eye"}}"##).unwrap();
+  let json = json::from_str(r##"{"p": { "k": "that poney has something sad in its eye"}}"##).unwrap();
   let tmpl = parse(r##"prelude {{#p}}{{k}}{{/p}} post"##).unwrap();
-  let mut buf = [0, ..1024];
+  let mut buf: Vec<u8> = Vec::new();
 
-  {  
-    let mut w = BufWriter::new(&mut buf);
-    eval(tmpl, &json, &mut w);
-  }
+  eval(&tmpl, &json, &mut buf);
 
-  let mut tt = [0, ..1024];
-  {
-    let mut w = BufWriter::new(&mut tt);
-    w.write_str("prelude that poney has something sad in its eye post");
-  }
-
-  assert_eq!(str::from_utf8(&buf).unwrap(), str::from_utf8(&buf).unwrap());
+  assert_eq!(String::from_utf8(buf).unwrap(), String::from_str("prelude that poney has something sad in its eye post"));
 }
