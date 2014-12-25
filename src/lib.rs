@@ -285,7 +285,7 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpression, (ParseError, Option<St
 }
 
 
-pub fn parse(template: &str) -> Result<&Template, (ParseError, Option<String>)> {
+pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
   let mut lexer = HandleBarsLexer::new(BufReader::new(template.as_bytes()));
   let mut raw = String::new();
   let mut stack = vec![box Template { content: vec![] }];
@@ -344,6 +344,10 @@ pub fn parse(template: &str) -> Result<&Template, (ParseError, Option<String>)> 
   return match stack.head() {
     Some(&box ref t) => Result::Ok(t),
     None => Result::Err((ParseError::UnkownError, None)),
+
+  return match stack.remove(0) {
+    Some(box t) => Result::Ok(t),
+    None        => Result::Err((ParseError::UnkownError, None)),
   };
 }
 
@@ -370,19 +374,20 @@ fn get_val_for_key<'a>(data: &'a Json, key_path: &Vec<String>) ->  Option<&'a Js
   return ctxt;
 }
 
-pub fn eval(template: &Template, data: &Json, out: &mut Writer) {
+pub fn eval(template: &Template, data: &Json, out: &mut Writer) -> Result<(), std::io::IoError> {
   let mut stack:Vec<_> = FromIterator::from_iter(template.content.iter().map(|e| {
     (e, data)
   }));
 
-  while let Some((templ, ctxt)) = stack.pop() {
-    match templ {
+  while let Some((templ, ctxt)) = stack.remove(0) {
+    let w_ok = match templ {
       &box HBEntry::Raw(ref s) => { 
-        out.write_str(s.as_slice());
+        out.write_str(s.as_slice())
       },
       &box HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref escape, ref no_white_space, block: None}) => {
         match get_val_for_key(ctxt, base) {
-          Some(v) => match(v) {
+          Some(v) => match v {
+            // should use a serializer here
             &Json::I64(ref i) => out.write_str(format!("{}", i).as_slice()),
             &Json::U64(ref u) => out.write_str(format!("{}", u).as_slice()),
             &Json::F64(ref f) => out.write_str(format!("{}", f).as_slice()),
@@ -391,23 +396,27 @@ pub fn eval(template: &Template, data: &Json, out: &mut Writer) {
             _ => Ok(()),
           },
           None => Ok(()),
-        };
+        }
       },
-      
+
       &box HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref escape, ref no_white_space, ref block}) => {
         let c_ctxt = get_val_for_key(ctxt, base);
         match (c_ctxt, block) {
           (Some(c), &Some(ref t)) => {
             for e in t.content.iter() {
-              stack.push((e, c));
+              stack.insert(0, (e, c));
             }
+            Ok(())
           },
-          _ => (),
-        };
+          _ => Ok(()),
+        }
       },
+    };
+
+    if let Err(no_ok) = w_ok {
+      return Err(no_ok);
     }
-
-
   }
+  return Ok(());
 }
 
