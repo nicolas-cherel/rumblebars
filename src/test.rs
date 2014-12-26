@@ -21,6 +21,8 @@ use Template;
 #[allow(unused_imports)]
 use HBEntry;
 #[allow(unused_imports)]
+use HBExpression;
+#[allow(unused_imports)]
 use get_val_for_key;
 #[allow(unused_imports)]
 use eval;
@@ -106,6 +108,15 @@ fn parse_raw() {
   let p = parse("tada").unwrap();
   assert_eq!("tada", match p.content.get(0) {
     Some(&box HBEntry::Raw(ref s)) => s.as_slice(),
+    _ => "",
+  });
+}
+
+#[test]
+fn parse_exp() {
+  let p = parse("{{tada}}").unwrap();
+  assert_eq!("tada", match p.content.get(0) {
+    Some(&box HBEntry::Eval(HBExpression {ref base, ..})) => base.head().unwrap().as_slice(),
     _ => "",
   });
 }
