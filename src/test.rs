@@ -122,6 +122,31 @@ fn parse_exp() {
 }
 
 #[test]
+fn parse_exp_entangled() {
+  let p = parse("tidi {{tada}} todo {{tudu}} bar").unwrap();
+  assert_eq!("tidi ", match p.content.get(0) {
+    Some(&box HBEntry::Raw(ref s)) => s.as_slice(),
+    _ => "",
+  });
+  assert_eq!("tada", match p.content.get(1) {
+    Some(&box HBEntry::Eval(HBExpression {ref base, ..})) => base.head().unwrap().as_slice(),
+    _ => "",
+  });
+  assert_eq!(" todo ", match p.content.get(2) {
+    Some(&box HBEntry::Raw(ref s)) => s.as_slice(),
+    _ => "",
+  });
+  assert_eq!("tudu", match p.content.get(3) {
+    Some(&box HBEntry::Eval(HBExpression {ref base, ..})) => base.head().unwrap().as_slice(),
+    _ => "",
+  });
+  assert_eq!(" bar", match p.content.get(4) {
+    Some(&box HBEntry::Raw(ref s)) => s.as_slice(),
+    _ => "",
+  });
+}
+
+#[test]
 fn fetch_key_value() {
   let json = json::from_str(r##"{"a": 1}"##).unwrap();
   assert_eq!(match get_val_for_key(&json, &vec![String::from_str("a")]) {
