@@ -57,8 +57,20 @@ pub fn eval(template: &Template, data: &Json, out: &mut Writer) -> Result<(), Io
         let c_ctxt = get_val_for_key(ctxt, base);
         match (c_ctxt, block) {
           (Some(c), &Some(ref t)) => {
-            for e in t.iter() {
-              stack.insert(0, (e, c));
+            match c {
+              &Json::Object(_) => {
+                for e in t.iter() {
+                  stack.insert(0, (e, c));
+                }                
+              },
+              &Json::Array(ref a) => {
+                for i in a.iter().rev() {
+                  for e in t.iter() {
+                    stack.insert(0, (e, i));
+                  }   
+                }
+              }
+              _ => (),
             }
             Ok(())
           },
