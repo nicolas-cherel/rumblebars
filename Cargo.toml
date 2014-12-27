@@ -1,6 +1,5 @@
 [package]
-
-name = "rumble-bars"
+name = "rumblebars"
 version = "0.0.1"
 authors = ["Nicolas Cherel <nicolas.cherel@gmail.com>"]
 
