@@ -3,7 +3,7 @@ use std::io::Writer;
 use std::slice;
 
 use self::Token::{TokSimpleExp, TokEscapedExp, TokBlockExp, TokBlockEndExp, TokRaw};
-use self::HBToken::{TokPathStart,TokPathSep,TokPathEntry,TokNoWhiteSpace,TokStringParam,TokParamStart, TokParamSep, TokOption};
+use self::HBToken::{TokPathStart,TokPathEntry,TokNoWhiteSpace,TokStringParam,TokParamStart, TokParamSep, TokOption};
 
 #[deriving(Show)]
 enum Token {
@@ -18,7 +18,6 @@ enum Token {
 #[deriving(Show)]
 enum HBToken {
   TokPathStart,
-  TokPathSep,
   TokPathEntry(String),
   TokNoWhiteSpace,
   TokStringParam(String),
@@ -214,13 +213,11 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpression, (ParseError, Option<St
         while let Some(tok) = lexer.next() {
           match tok {
             TokPathEntry(path_comp) => { path.push(path_comp) },
-            TokPathSep => {}
             TokParamStart => {
               let mut param_path = vec![];
               while let Some(tok) = lexer.next() {
                 match tok {
                   TokPathEntry(path_comp) => { param_path.push(path_comp) },
-                  TokPathSep => {},
                   TokStringParam(s) => { params.push(HBValHolder::String(s)) },
                   TokParamSep => {
                     if param_path.len() > 0 {
@@ -240,7 +237,6 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpression, (ParseError, Option<St
                         TokPathEntry(s) => {
                           opt_path.push(s);
                         },
-                        TokPathSep => {},
                         TokStringParam(s) => {
                           opt_val = Some(s);
                           break;
