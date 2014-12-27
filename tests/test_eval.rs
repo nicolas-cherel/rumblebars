@@ -14,7 +14,7 @@ fn simple_render() {
 
   eval(&tmpl, &json, &mut buf).unwrap();
 
-  assert_eq!(String::from_utf8(buf).unwrap(), String::from_str("that poney has something sad in its eye"));
+  assert_eq!(String::from_utf8(buf).unwrap(), "that poney has something sad in its eye".to_string());
 }
 
 #[test]
@@ -25,7 +25,7 @@ fn simple_render_with_raw() {
 
   eval(&tmpl, &json, &mut buf).unwrap();
 
-  assert_eq!(String::from_utf8(buf).unwrap(), String::from_str("prelude that poney has something sad in its eye post"));
+  assert_eq!(String::from_utf8(buf).unwrap(), "prelude that poney has something sad in its eye post".to_string());
 }
 
 #[test]

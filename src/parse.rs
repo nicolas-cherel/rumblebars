@@ -109,7 +109,7 @@ rustlex! HBExpressionLexer {
     OPTION_NAME  => |lexer:&mut HBExpressionLexer<R>| {  
       lexer.in_options = true; 
       lexer.OPTION_VALUE(); 
-      Some( TokOption( String::from_str(lexer.yystr().as_slice().trim_right_chars('=')) ) ) 
+      Some( TokOption( lexer.yystr().as_slice().trim_right_chars('=').to_string() ) ) 
     }
 
     // common expression ending 
@@ -133,7 +133,7 @@ rustlex! HBExpressionLexer {
   }
 
   OPTIONS {
-    OPTION_NAME  => |lexer:&mut HBExpressionLexer<R>| {  lexer.OPTION_VALUE(); Some( TokOption( String::from_str(lexer.yystr().as_slice().trim_right_chars('=')) ) ) }
+    OPTION_NAME  => |lexer:&mut HBExpressionLexer<R>| {  lexer.OPTION_VALUE(); Some( TokOption( lexer.yystr().as_slice().trim_right_chars('=').to_string() ) ) }
     PARAMS_SEP    => |_:&mut HBExpressionLexer<R>| { None } 
 
     // common expression ending 
@@ -213,15 +213,15 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpression, (ParseError, Option<St
 
         while let Some(tok) = lexer.next() {
           match tok {
-            TokPathEntry(path_comp) => { path.push(String::from_str(path_comp.as_slice())) },
+            TokPathEntry(path_comp) => { path.push(path_comp) },
             TokPathSep => {}
             TokParamStart => {
               let mut param_path = vec![];
               while let Some(tok) = lexer.next() {
                 match tok {
-                  TokPathEntry(path_comp) => { param_path.push(String::from_str(path_comp.as_slice())) },
+                  TokPathEntry(path_comp) => { param_path.push(path_comp) },
                   TokPathSep => {},
-                  TokStringParam(s) => { params.push(HBValHolder::String(String::from_str(s.as_slice()))) },
+                  TokStringParam(s) => { params.push(HBValHolder::String(s)) },
                   TokParamSep => {
                     if param_path.len() > 0 {
                       params.push(HBValHolder::Path(param_path));
@@ -238,11 +238,11 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpression, (ParseError, Option<St
                     while let Some(tok) = lexer.next() {
                       match tok {
                         TokPathEntry(s) => {
-                          opt_path.push(String::from_str(s.as_slice()));
+                          opt_path.push(s);
                         },
                         TokPathSep => {},
                         TokStringParam(s) => {
-                          opt_val = Some(String::from_str(s.as_slice()));
+                          opt_val = Some(s);
                           break;
                         },
                         TokNoWhiteSpace => { no_white_space = true },

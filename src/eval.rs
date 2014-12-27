@@ -86,7 +86,7 @@ mod tests {
   #[test]
   fn fetch_key_value() {
     let json = json::from_str(r##"{"a": 1}"##).unwrap();
-    assert_eq!(match get_val_for_key(&json, &vec![String::from_str("a")]) {
+    assert_eq!(match get_val_for_key(&json, &vec!["a".to_string()]) {
       Some(&Json::U64(a)) => a, 
       _ => 10000
     }, 1);
@@ -95,7 +95,7 @@ mod tests {
   #[test]
   fn fetch_key_value_level1() {
     let json = json::from_str(r##"{"a": {"b": 1}}"##).unwrap();
-    assert_eq!(1, match get_val_for_key(&json, &vec![String::from_str("a"), String::from_str("b")]) {
+    assert_eq!(1, match get_val_for_key(&json, &vec!["a".to_string(), "b".to_string()]) {
       Some(&Json::U64(a)) => a, 
       _ => 10000
     });
@@ -104,7 +104,7 @@ mod tests {
   #[test]
   fn fetch_key_value_array_level1() {
     let json = json::from_str(r##"{"a": [1, 2, 3]}"##).unwrap();
-    assert_eq!(1, match get_val_for_key(&json, &vec![String::from_str("a"), String::from_str("0")]) {
+    assert_eq!(1, match get_val_for_key(&json, &vec!["a".to_string(), "0".to_string()]) {
       Some(&Json::U64(a)) => a, 
       _ => 10000
     });
@@ -113,7 +113,7 @@ mod tests {
   #[test]
   fn deep_path_none() {
     let json = json::from_str(r##"{"a": 1}"##).unwrap();
-    assert_eq!(None, get_val_for_key(&json, &vec![String::from_str("a"), String::from_str("b")]));
+    assert_eq!(None, get_val_for_key(&json, &vec!["a".to_string(), "b".to_string()]));
   }
 }
 
