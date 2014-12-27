@@ -64,12 +64,20 @@ rustlex! HBExpressionLexer {
   let STRING_CTNT  = ("\\\"" | [^'"'])*; // either escaped quote or not quote
   let STRING_END   = ['"'];
 
+  let ACCESSOR_SEP_SLASH = "/";
+  let DOT_STARTED = ("." | "..");
+
+
   let IDENTIFIER = [^'!''"''#''%''&''\'''('')''*''+'',''.''/'';''<''=''>''@''[''\\'']''^''`''{''|''}''~'' ''\t']+;
   let BRACKET_ID_START = '[';
   let BRACKET_ID_END   = ']';
   let BRACKETED_ID     = [^']']+;
-  let ACCESSOR_SEP     = '.';
+  let ACCESSOR_SEP     = ['.''/'];
   let ACCESSOR_END     = [' ''\t']+;
+
+  let THIS             = "this";
+  let THIS_ALIAS       = ".";
+  let PARENT_ALIAS     = "..";
 
   let PARAMS_SEP       = [' ''\t']+;
 
@@ -81,9 +89,16 @@ rustlex! HBExpressionLexer {
   }
 
   ACCESSOR {
-    IDENTIFIER =>       |lexer:&mut HBExpressionLexer<R>| { Some( TokPathEntry( lexer.yystr() ) ) }
+    IDENTIFIER =>       |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( lexer.yystr() ) ) }
     BRACKET_ID_START => |lexer:&mut HBExpressionLexer<R>| { lexer.ID_ANY(); None }
-    ACCESSOR_SEP => |    _:&mut HBExpressionLexer<R>| { Some( TokPathSep ) }
+    
+    THIS         => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( ".".to_string()  ) ) }
+    THIS_ALIAS   => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( ".".to_string()  ) ) }
+    PARENT_ALIAS => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( "..".to_string() ) ) }
+  }
+
+  PROPERTY_PATH {
+    ACCESSOR_SEP => |lexer:&mut HBExpressionLexer<R>| { lexer.ACCESSOR(); None }
     ACCESSOR_END => |lexer:&mut HBExpressionLexer<R>| { 
       if lexer.in_options  { lexer.OPTIONS() } else { lexer.PARAMS() }; 
       Some( TokParamStart ) 
@@ -96,7 +111,7 @@ rustlex! HBExpressionLexer {
 
   ID_ANY {
     BRACKETED_ID   => |lexer:&mut HBExpressionLexer<R>| { Some( TokPathEntry( lexer.yystr() ) ) }
-    BRACKET_ID_END => |lexer:&mut HBExpressionLexer<R>| { lexer.ACCESSOR(); None }
+    BRACKET_ID_END => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); None }
   }
 
   PARAMS {
@@ -378,6 +393,22 @@ mod tests {
   fn hb_simple_base_esc_path() {
     match parse_hb_expression("{{[i]}}") { 
       Ok(ok)  => assert_eq!(ok.base, vec!["i"]),
+      Err(_)  => (),
+    }
+  }
+
+  #[test]
+  fn hb_simple_this_path() {
+    match parse_hb_expression("{{.}}") { 
+      Ok(ok)  => assert_eq!(ok.base, vec!["."]),
+      Err(_)  => (),
+    }
+  }
+
+  #[test]
+  fn hb_this_path() {
+    match parse_hb_expression("{{./p}}") { 
+      Ok(ok)  => assert_eq!(ok.base, vec![".", "p"]),
       Err(_)  => (),
     }
   }
