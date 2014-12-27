@@ -9,6 +9,10 @@ fn get_val_for_key<'a>(data: &'a Json, key_path: &Vec<String>) ->  Option<&'a Js
   let mut ctxt = Some(data);
   
   for key in key_path.iter() {
+    if key.as_slice() == "." {
+      continue;
+    }
+
     let some_num_key = key.as_slice().parse();
     ctxt = match ctxt {
       Some(&Json::Array(ref a)) => {
@@ -120,6 +124,24 @@ mod tests {
       Some(&Json::U64(a)) => a, 
       _ => 10000
     });
+  }
+
+  #[test]
+  fn resolve_this_in_keypath() {
+    let json = json::from_str(r##""hello""##).unwrap();
+    assert_eq!("hello", match get_val_for_key(&json, &vec![".".to_string()]) {
+      Some(&Json::String(ref v)) => v.clone(),
+      _ => "".to_string(),
+    })
+  }
+
+  #[test]
+  fn resolve_this_subkey_in_keypath() {
+    let json = json::from_str(r##"{"t": "hello"}"##).unwrap();
+    assert_eq!("hello", match get_val_for_key(&json, &vec![".".to_string(), "t".to_string()]) {
+      Some(&Json::String(ref v)) => v.clone(),
+      _ => "".to_string(),
+    })
   }
 
   #[test]
