@@ -55,6 +55,7 @@ rustlex! HandleBarsLexer {
 rustlex! HBExpressionLexer {
   token HBToken;
   property in_options:bool = false;
+  property in_params:bool = false;
 
   let START = "{{" ['{''#''/']?;
   let END =  '}'? "}}"; // no escaping triple {{{ check for now
@@ -91,6 +92,8 @@ rustlex! HBExpressionLexer {
   ACCESSOR {
     IDENTIFIER =>       |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( lexer.yystr() ) ) }
     BRACKET_ID_START => |lexer:&mut HBExpressionLexer<R>| { lexer.ID_ANY(); None }
+
+    STRING_START => |lexer:&mut HBExpressionLexer<R>| { lexer.STRING_PARAM(); None } // for parameters only
     
     THIS         => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( ".".to_string()  ) ) }
     THIS_ALIAS   => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( ".".to_string()  ) ) }
@@ -100,8 +103,13 @@ rustlex! HBExpressionLexer {
   PROPERTY_PATH {
     ACCESSOR_SEP => |lexer:&mut HBExpressionLexer<R>| { lexer.ACCESSOR(); None }
     ACCESSOR_END => |lexer:&mut HBExpressionLexer<R>| { 
-      if lexer.in_options  { lexer.OPTIONS() } else { lexer.PARAMS() }; 
-      Some( TokParamStart ) 
+      if lexer.in_options  { lexer.OPTIONS() } else { lexer.PARAMS() };
+      if (lexer.in_params) {
+        Some( TokParamSep )
+      } else {
+        lexer.in_params = true;
+        Some( TokParamStart )
+      }
     }
 
     // common ending
@@ -116,8 +124,8 @@ rustlex! HBExpressionLexer {
 
   PARAMS {
     PARAMS_SEP   => |    _:&mut HBExpressionLexer<R>| { Some( TokParamSep ) }
-    IDENTIFIER   => |lexer:&mut HBExpressionLexer<R>| { lexer.ACCESSOR(); Some( TokPathEntry( lexer.yystr() ) ) }
-    STRING_START => |lexer:&mut HBExpressionLexer<R>| { lexer.STRING_PARAM(); None }
+    IDENTIFIER   => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( lexer.yystr() ) ) }
+    STRING_START => |lexer:&mut HBExpressionLexer<R>| { lexer.STRING_PARAM(); None } 
 
     // end of parameters
     OPTION_NAME  => |lexer:&mut HBExpressionLexer<R>| {  
@@ -139,7 +147,7 @@ rustlex! HBExpressionLexer {
 
   OPTION_VALUE {
     // all of these have conditional ending with in_params
-    IDENTIFIER       => |lexer:&mut HBExpressionLexer<R>| { lexer.ACCESSOR(); Some( TokPathEntry( lexer.yystr() ) ) }
+    IDENTIFIER       => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( lexer.yystr() ) ) }
     BRACKET_ID_START => |lexer:&mut HBExpressionLexer<R>| { lexer.ID_ANY(); None }
     STRING_START     => |lexer:&mut HBExpressionLexer<R>| { lexer.STRING_PARAM(); None }
 
@@ -193,16 +201,6 @@ impl Template {
   pub fn iter<'a>(&'a self) -> slice::Iter<'a, Box<HBEntry>> {
     return self.content.iter();
   }
-}
-
-#[allow(dead_code)]
-fn debug_parse_hb(exp: &str) {
-  let mut lexer = HBExpressionLexer::new(BufReader::new(exp.as_bytes()));
-  println!("{}", exp);
-  for tok in *lexer {
-    println!("{}", tok);
-  }
-
 }
 
 #[deriving(Show)]
@@ -265,13 +263,11 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpression, (ParseError, Option<St
 
                   },
                   TokNoWhiteSpace => { no_white_space = true },
-                  _ => { 
-                    if param_path.len() > 0 {
-                      params.push(HBValHolder::Path(param_path));
-                    }
-                    break; 
-                  }
+                  _ => { break; }
                 }
+              }
+              if param_path.len() > 0 {
+                params.push(HBValHolder::Path(param_path));
               }
             },
             TokNoWhiteSpace => { no_white_space = true },
@@ -363,7 +359,19 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
 
 #[cfg(test)]
 mod tests {
-  use super::{parse, parse_hb_expression, HBEntry, HBExpression};
+  use std::io::BufReader;
+
+  use super::{parse, parse_hb_expression, HBEntry, HBExpression, HBValHolder, HBExpressionLexer};
+
+  #[allow(dead_code)]
+  fn debug_parse_hb(exp: &str) {
+    let mut lexer = HBExpressionLexer::new(BufReader::new(exp.as_bytes()));
+    println!("{}", exp);
+    for tok in *lexer {
+      println!("{}", tok);
+    }
+
+  }
 
   #[test]
   fn hb_simple() {
@@ -409,6 +417,66 @@ mod tests {
   fn hb_this_path() {
     match parse_hb_expression("{{./p}}") { 
       Ok(ok)  => assert_eq!(ok.base, vec![".", "p"]),
+      Err(_)  => (),
+    }
+  }
+
+  #[test]
+  fn hb_string_param() {
+    match parse_hb_expression(r##"{{p "string"}}"##) { 
+      Ok(HBExpression{ref base, ref params, ref options, ref escape, ref no_white_space, ref block})  => {
+        assert_eq!(base, &vec!["p"]);
+        assert_eq!(match params.get(0).unwrap() { &HBValHolder::String(ref s) => s.clone(), _ => "".to_string()}, "string".to_string());
+      },
+      Err(_)  => (),
+    }
+  }
+
+  #[test]
+  fn hb_prop_path_param() {
+    match parse_hb_expression(r##"{{p some.path}}"##) { 
+      Ok(HBExpression{ref base, ref params, ref options, ref escape, ref no_white_space, ref block})  => {
+        assert_eq!(base, &vec!["p"]);
+        assert_eq!(match params.get(0).unwrap() { &HBValHolder::Path(ref p) => p.clone(), _ => vec![]}, vec!["some", "path"]);
+      },
+      Err(_)  => (),
+    }
+  }
+
+  #[test]
+  fn hb_2_params() {
+    match parse_hb_expression(r##"{{p some path}}"##) { 
+      Ok(HBExpression{ref base, ref params, ref options, ref escape, ref no_white_space, ref block})  => {
+        assert_eq!(base, &vec!["p"]);
+        assert_eq!(match params.get(0).unwrap() { &HBValHolder::Path(ref p) => p.clone(), _ => vec![]}, vec!["some"]);
+        assert_eq!(match params.get(1).unwrap() { &HBValHolder::Path(ref p) => p.clone(), _ => vec![]}, vec!["path"]);
+      },
+      Err(_)  => (),
+    }
+  }
+
+  #[test]
+  fn hb_3_params() {
+    match parse_hb_expression(r##"{{p some.path "with_string" yep}}"##) { 
+      Ok(HBExpression{ref base, ref params, ref options, ref escape, ref no_white_space, ref block})  => {
+        assert_eq!(base, &vec!["p"]);
+        assert_eq!(match params.get(0).unwrap() { &HBValHolder::Path(ref p) => p.clone(), _ => vec![]}, vec!["some", "path"]);
+        assert_eq!(match params.get(1).unwrap() { &HBValHolder::String(ref s) => s.clone(), _ => "".to_string()}, "with_string".to_string());
+        assert_eq!(match params.get(2).unwrap() { &HBValHolder::Path(ref p) => p.clone(), _ => vec![]}, vec!["yep"]);
+      },
+      Err(_)  => (),
+    }
+  }
+
+  #[test]
+  fn hb_full_feat() {
+    match parse_hb_expression(r##"{{t "… param1" well.[that my baby].[1] ~}}"##) { 
+      Ok(HBExpression{ref base, ref params, ref options, ref escape, ref no_white_space, ref block})  => {
+        assert_eq!(base, &vec!["t"]);
+        assert_eq!(match params.get(0).unwrap() { &HBValHolder::String(ref s) => s.clone(), _ => "".to_string()}, "… param1".to_string());
+        assert_eq!(match params.get(1).unwrap() { &HBValHolder::Path(ref p) => p.clone(), _ => vec![]}, vec!["well", "that my baby", "1"]);
+        assert!(*no_white_space);
+      },
       Err(_)  => (),
     }
   }
