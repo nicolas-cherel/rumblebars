@@ -41,11 +41,22 @@ fn simple_render_with_block() {
 
 #[test]
 fn iteration_with_block() {
-  let json = json::from_str(r##"{"p": [{"i": 1}, {"i": 2}, {"i": 3}, {"i": 4}]}"##).unwrap();
-  let tmpl = parse(r##"{{#p}}{{i}}{{/p}}"##).unwrap();
+  let json = json::from_str(r##"{"p": [ 1,  2,  3,  4]}"##).unwrap();
+  let tmpl = parse(r##"{{#p}}{{.}}{{/p}}"##).unwrap();
   let mut buf: Vec<u8> = Vec::new();
 
   eval(&tmpl, &json, &mut buf).unwrap();
 
   assert_eq!(String::from_utf8(buf).unwrap(), "1234".to_string());
+}
+
+#[test]
+fn parent_key() {
+  let json = json::from_str(r##"{"a": {"b": "bb"}, "c": "ccc"}"##).unwrap();
+  let tmpl = parse(r##"{{#a}}{{b}}{{../c}}{{/a}}"##).unwrap();
+  let mut buf: Vec<u8> = Vec::new();
+
+  eval(&tmpl, &json, &mut buf).unwrap();
+
+  assert_eq!(String::from_utf8(buf).unwrap(), "bbccc".to_string());
 }
