@@ -469,12 +469,64 @@ mod tests {
   }
 
   #[test]
-  fn hb_full_feat() {
+  fn hb_full_feat_param() {
     match parse_hb_expression(r##"{{t "… param1" well.[that my baby].[1] ~}}"##) { 
       Ok(HBExpression{ref base, ref params, ref options, ref escape, ref no_white_space, ref block})  => {
         assert_eq!(base, &vec!["t"]);
         assert_eq!(match params.get(0).unwrap() { &HBValHolder::String(ref s) => s.clone(), _ => "".to_string()}, "… param1".to_string());
         assert_eq!(match params.get(1).unwrap() { &HBValHolder::Path(ref p) => p.clone(), _ => vec![]}, vec!["well", "that my baby", "1"]);
+        assert!(*no_white_space);
+      },
+      Err(_)  => (),
+    }
+  }
+
+  #[test]
+  fn hb_option() {
+    match parse_hb_expression(r##"{{t opt=u ~}}"##) { 
+      Ok(HBExpression{ref base, ref params, ref options, ref escape, ref no_white_space, ref block})  => {
+        assert_eq!(base, &vec!["t"]);
+        assert_eq!(("opt".to_string(), vec!["u".to_string()]), match options.get(0).unwrap() { 
+          &(ref o, HBValHolder::Path(ref p)) => (o.clone(), p.clone()), 
+          _ => ("".to_string(), vec![]),
+        });
+        assert!(*no_white_space);
+      },
+      Err(_)  => (),
+    }
+  }
+
+  #[test]
+  fn hb_mutli_options() {
+    match parse_hb_expression(r##"{{t opt=u opt2="v" ~}}"##) { 
+      Ok(HBExpression{ref base, ref params, ref options, ref escape, ref no_white_space, ref block})  => {
+        assert_eq!(base, &vec!["t"]);
+        assert_eq!(("opt".to_string(), vec!["u".to_string()]), match options.get(0).unwrap() { 
+          &(ref o, HBValHolder::Path(ref p)) => (o.clone(), p.clone()), 
+          _ => ("".to_string(), vec![]),
+        });
+        assert_eq!(("opt2".to_string(), "v".to_string()), match options.get(1).unwrap() { 
+          &(ref o, HBValHolder::String(ref s)) => (o.clone(), s.clone()), 
+          _ => ("".to_string(), "".to_string()),
+        });
+        assert!(*no_white_space);
+      },
+      Err(_)  => (),
+    }
+  }
+
+  #[test]
+  fn hb_param_options() {
+    match parse_hb_expression(r##"{{t o.[t}+=] opt="v" ~}}"##) { 
+      Ok(HBExpression{ref base, ref params, ref options, ref escape, ref no_white_space, ref block})  => {
+        assert_eq!(base, &vec!["t"]);
+        assert_eq!(vec!["o", "t}+="], match params.get(0).unwrap() {
+          &HBValHolder::Path(ref p) => p.clone(), _ => vec![]
+        });
+        assert_eq!(("opt".to_string(), "v".to_string()), match options.get(0).unwrap() { 
+          &(ref o, HBValHolder::String(ref s)) => (o.clone(), s.clone()), 
+          _ => ("".to_string(), "".to_string()),
+        });
         assert!(*no_white_space);
       },
       Err(_)  => (),
