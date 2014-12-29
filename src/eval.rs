@@ -10,15 +10,15 @@ fn get_val_for_key<'a>(data: &'a Json, key_path: &Vec<String>, context_stack: &V
   let mut stack_index = 0;
   
   for key in key_path.iter() {
-    if key.as_slice() == "." {
-      continue;
-    }
-
-    if key.as_slice() == ".." {
-      stack_index += 1;
-      assert!(stack_index <= context_stack.len());
-      ctxt = Some(*context_stack.get(context_stack.len() - stack_index).unwrap());
-      continue;
+    match key.as_slice() {
+      "."  => {continue},
+      ".." => {
+        stack_index += 1;
+        assert!(stack_index <= context_stack.len());
+        ctxt = Some(*context_stack.get(context_stack.len() - stack_index).unwrap());
+        continue;
+      }
+      _ => (),
     }
 
     let some_num_key = key.as_slice().parse();
