@@ -54,11 +54,11 @@ pub fn eval(template: &Template, data: &Json, out: &mut Writer) -> Result<(), Io
         match get_val_for_key(ctxt, base, &ctxt_stack) {
           Some(v) => match v {
             // should use a serializer here
-            &Json::I64(ref i) => out.write_str(format!("{}", i).as_slice()),
-            &Json::U64(ref u) => out.write_str(format!("{}", u).as_slice()),
-            &Json::F64(ref f) => out.write_str(format!("{}", f).as_slice()),
-            &Json::String(ref s) => out.write_str(format!("{}", s).as_slice()),
-            &Json::Boolean(ref b) => out.write_str(format!("{}", b).as_slice()),
+            &Json::I64(ref i)     => write!(out, "{}", i),
+            &Json::U64(ref u)     => write!(out, "{}", u),
+            &Json::F64(ref f)     => write!(out, "{}", f),
+            &Json::String(ref s)  => write!(out, "{}", s),
+            &Json::Boolean(ref b) => write!(out, "{}", b),
             _ => Ok(()),
           },
           None => Ok(()),
