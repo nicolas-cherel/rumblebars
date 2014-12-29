@@ -41,13 +41,24 @@ fn simple_render_with_block() {
 
 #[test]
 fn iteration_with_block() {
-  let json = json::from_str(r##"{"p": [ 1,  2,  3,  4]}"##).unwrap();
+  let json = json::from_str(r##"{"p": [ 1, 2, 3, 4]}"##).unwrap();
   let tmpl = parse(r##"{{#p}}{{.}}{{/p}}"##).unwrap();
   let mut buf: Vec<u8> = Vec::new();
 
   eval(&tmpl, &json, &mut buf).unwrap();
 
   assert_eq!(String::from_utf8(buf).unwrap(), "1234".to_string());
+}
+
+#[test]
+fn iteration_with_rich_block() {
+  let json = json::from_str(r##"{"p": [ {"i": 1, "j": "a"}, {"i": 2, "j": "b"}, {"i": 3, "j": "c"}, {"i": 4, "j": "d"}]}"##).unwrap();
+  let tmpl = parse(r##"{{#p}}{{i}}({{j}}){{/p}}"##).unwrap();
+  let mut buf: Vec<u8> = Vec::new();
+
+  eval(&tmpl, &json, &mut buf).unwrap();
+
+  assert_eq!(String::from_utf8(buf).unwrap(), "1(a)2(b)3(c)4(d)".to_string());
 }
 
 #[test]
@@ -59,4 +70,15 @@ fn parent_key() {
   eval(&tmpl, &json, &mut buf).unwrap();
 
   assert_eq!(String::from_utf8(buf).unwrap(), "bbccc".to_string());
+}
+
+#[test]
+fn iteration_with_block_and_parent_key() {
+  let json = json::from_str(r##"{"p": [ 1,  2,  3,  4], "b": "-"}"##).unwrap();
+  let tmpl = parse(r##"{{#p}}{{.}}{{../b}}{{/p}}"##).unwrap();
+  let mut buf: Vec<u8> = Vec::new();
+
+  eval(&tmpl, &json, &mut buf).unwrap();
+
+  assert_eq!(String::from_utf8(buf).unwrap(), "1-2-3-4-".to_string());
 }
