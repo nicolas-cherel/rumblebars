@@ -80,7 +80,7 @@ pub fn eval(template: &Template, data: &Json, out: &mut Writer) -> Result<(), Io
               },
               &Json::Array(ref a) => {
                 for i in a.iter().rev() {
-                  for e in t.iter() {
+                  for e in t.iter().rev() {
                     let mut c_stack = ctxt_stack.clone();
                     c_stack.push(ctxt);
                     stack.insert(0, (e, i, c_stack));
