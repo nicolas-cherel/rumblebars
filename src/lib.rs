@@ -6,11 +6,6 @@
 
 extern crate serialize;
 
-// compile tests for generic template writing
-use std::io::{IoError, Writer};
-use serialize::json;
-use serialize::json::Json;
-
 pub use self::parse::parse;
 pub use self::parse::ParseError;
 pub use self::parse::Template;

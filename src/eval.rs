@@ -119,12 +119,6 @@ pub fn eval(template: &Template, data: &HBData, out: &mut Writer) -> Result<(), 
         match ctxt.value_for_key_path(base, &ctxt_stack) {
           Some(v) => match v.typed_node() {
             HBNodeType::Leaf(_) => v.write_value(out),
-            // // should use a serializer here
-            // &Json::I64(ref i)     => write!(out, "{}", i),
-            // &Json::U64(ref u)     => write!(out, "{}", u),
-            // &Json::F64(ref f)     => write!(out, "{}", f),
-            // &Json::String(ref s)  => write!(out, "{}", s),
-            // &Json::Boolean(ref b) => write!(out, "{}", b),
             _ => Ok(()),
           },
           None => Ok(()),
