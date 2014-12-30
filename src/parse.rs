@@ -192,7 +192,7 @@ pub enum HBEntry {
   Eval(HBExpression)
 }
 
-#[deriving(Show)]
+#[deriving(Show, Default)]
 pub struct Template {
   content: Vec<Box<HBEntry>>
 }
@@ -202,6 +202,7 @@ impl Template {
     return self.content.iter();
   }
 }
+
 
 #[deriving(Show)]
 pub enum ParseError {
