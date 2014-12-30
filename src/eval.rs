@@ -115,6 +115,11 @@ pub fn eval(template: &Template, data: &HBData, out: &mut Writer) -> Result<(), 
       &box HBEntry::Raw(ref s) => { 
         out.write_str(s.as_slice())
       },
+      &box HBEntry::Partial(HBExpression{ref base, ..}) => {
+        // TODO look up and render partial
+        Ok(())
+      },
+
       &box HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref escape, ref no_white_space, block: None}) => {
         match ctxt.value_for_key_path(base, &ctxt_stack) {
           Some(v) => match v.typed_node() {

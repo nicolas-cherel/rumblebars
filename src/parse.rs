@@ -2,7 +2,7 @@ use std::io::BufReader;
 use std::io::Writer;
 use std::slice;
 
-use self::Token::{TokSimpleExp, TokEscapedExp, TokBlockExp, TokBlockEndExp, TokRaw};
+use self::Token::{TokSimpleExp, TokEscapedExp, TokBlockExp, TokBlockEndExp, TokPartialExp, TokRaw};
 use self::HBToken::{TokPathStart,TokPathEntry,TokNoWhiteSpace,TokStringParam,TokParamStart, TokParamSep, TokOption};
 
 #[deriving(Show)]
@@ -10,6 +10,7 @@ enum Token {
   // base template tokens 
   TokSimpleExp(String),
   TokEscapedExp(String),
+  TokPartialExp(String),
   TokBlockExp(String),
   TokBlockEndExp(String),
   TokRaw(String),
@@ -38,6 +39,7 @@ rustlex! HandleBarsLexer {
     let BLOCK_EXP   = OPEN '#' EXP CLOSE;
     let END_EXP     = OPEN '/' EXP CLOSE;
     let ESC_EXP     = OPEN '{' EXP '}' CLOSE;
+    let PARTIAL_EXP = OPEN '>' EXP CLOSE;
     let SIMPLE_EXP  = OPEN EXP CLOSE;
 
 
@@ -45,6 +47,7 @@ rustlex! HandleBarsLexer {
     PASS_THROUGH => |lexer:&mut HandleBarsLexer<R>| Some( TokRaw( lexer.yystr() ) )
     
     SIMPLE_EXP   => |lexer:&mut HandleBarsLexer<R>| Some( TokSimpleExp( lexer.yystr() ) )
+    PARTIAL_EXP  => |lexer:&mut HandleBarsLexer<R>| Some( TokPartialExp( lexer.yystr() ) )
     ESC_EXP      => |lexer:&mut HandleBarsLexer<R>| Some( TokEscapedExp( lexer.yystr() ) )
     END_EXP      => |lexer:&mut HandleBarsLexer<R>| Some( TokBlockEndExp( lexer.yystr() ) )
     BLOCK_EXP    => |lexer:&mut HandleBarsLexer<R>| Some( TokBlockExp( lexer.yystr() ) )
@@ -189,7 +192,8 @@ pub struct HBExpression {
 #[deriving(Show)]
 pub enum HBEntry {
   Raw(String),
-  Eval(HBExpression)
+  Eval(HBExpression),
+  Partial(HBExpression),
 }
 
 #[deriving(Show, Default)]
@@ -299,7 +303,7 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
     // first match handle raw content
     match tok {
       TokRaw(ref chr) => raw.push_str(chr.as_slice()),
-      TokSimpleExp(_) | TokEscapedExp(_) | TokBlockExp(_) | TokBlockEndExp(_) => {
+      TokSimpleExp(_) | TokEscapedExp(_) | TokBlockExp(_) | TokBlockEndExp(_) | TokPartialExp(_) => {
         if ! raw.is_empty() {
           stack.last_mut().unwrap().content.push(box HBEntry::Raw(raw));
           raw = String::new();
@@ -309,6 +313,7 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
 
     // second match handle handlebars expressions
     match tok {
+      TokRaw(_) => (),
       TokSimpleExp(exp) => {
         if let Ok(hb) = parse_hb_expression(exp.as_slice()) {
           stack.last_mut().unwrap().content.push(box HBEntry::Eval(hb))
@@ -318,6 +323,11 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
         if let Ok(mut hb) = parse_hb_expression(exp.as_slice()) {
           hb.escape = true;
           stack.last_mut().unwrap().content.push(box HBEntry::Eval(hb))
+        }
+      },
+      TokPartialExp(exp) => {
+        if let Ok(hb) = parse_hb_expression(exp.as_slice()) {
+          stack.last_mut().unwrap().content.push(box HBEntry::Partial(hb))
         }
       },
       TokBlockExp(exp) => {
@@ -341,9 +351,6 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
           }
         }
       }
-
-      // irrelevant here (mostly due of use of same enum)
-      _ => {}
     }
 
   }
