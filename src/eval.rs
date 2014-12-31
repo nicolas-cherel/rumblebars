@@ -177,7 +177,6 @@ pub fn eval(template: &Template, data: &HBData, out: &mut Writer, eval_context: 
           (Some(c), &Some(ref block_found)) => {
             match c.typed_node() {
               HBNodeType::Branch(_) => {
-              // &Json::Object(_) => {
                 for e in block_found.iter().rev() {
                   let mut c_stack = ctxt_stack.clone();
                   c_stack.push(ctxt);
@@ -185,7 +184,6 @@ pub fn eval(template: &Template, data: &HBData, out: &mut Writer, eval_context: 
                 }                
               },
               HBNodeType::Array(a) => {
-              // &Json::Array(ref a) => {
                 if let Some(collection) = a.as_array() {
                   for array_i in collection.iter().rev() {
                     for e in block_found.iter().rev() {
