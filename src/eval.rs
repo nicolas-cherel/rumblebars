@@ -1,9 +1,11 @@
 use std::io::{IoError, Writer};
 use serialize::json::Json;
+use std::collections::HashMap;
 
 use parse::Template;
 use parse::HBEntry;
 use parse::HBExpression;
+use parse::HBValHolder;
 
 fn get_val_for_key<'a>(data: &'a HBData, key_path: &Vec<String>, context_stack: &Vec<&'a HBData>) ->  Option<&'a (HBData + 'a)> {
   let mut ctxt = Some(data);
@@ -104,8 +106,31 @@ impl HBData for Json {
   }
 }
 
+pub struct HelperOptions;
+pub trait Helper {
+  fn call(&self, context: &HBData, options: &HelperOptions, out: &mut Writer) -> Result<(), IoError>;
+}
 
-pub fn eval(template: &Template, data: &HBData, out: &mut Writer) -> Result<(), IoError> {
+#[deriving(Default)]
+pub struct EvalContext<'a> {
+  partials: HashMap<&'a str, &'a Template>,
+  helpers: HashMap<&'a str, &'a (Helper + 'a)>,
+}
+
+impl <'a> EvalContext<'a> {
+  pub fn register_partial(&mut self, name: &'a str, t: &'a Template) {
+    self.partials.insert(name, t);
+  }
+
+  fn partial_with_name(&self, name: &str) -> Option<&Template> {
+    return match self.partials.get(name) {
+      Some(&t) => Some(t),
+      None => None,
+    }
+  }
+}
+
+pub fn eval(template: &Template, data: &HBData, out: &mut Writer, eval_context: &EvalContext) -> Result<(), IoError> {
   let mut stack:Vec<_> = FromIterator::from_iter(template.iter().map(|e| {
     (e, data, Vec::new())
   }));
@@ -115,9 +140,24 @@ pub fn eval(template: &Template, data: &HBData, out: &mut Writer) -> Result<(), 
       &box HBEntry::Raw(ref s) => { 
         out.write_str(s.as_slice())
       },
-      &box HBEntry::Partial(HBExpression{ref base, ..}) => {
-        // TODO look up and render partial
-        Ok(())
+      &box HBEntry::Partial(HBExpression{ref base, ref params, ..}) => {
+        match eval_context.partial_with_name(base.get(0).unwrap().as_slice()) {
+          Some(t) => {
+            let c_ctxt = if let Some(&HBValHolder::Path(ref p)) = params.get(0) {
+              ctxt.value_for_key_path(p, &ctxt_stack).unwrap_or(ctxt)
+            } else {
+              ctxt
+            };
+
+            for e in t.iter().rev() {
+              let mut c_stack = ctxt_stack.clone();
+              c_stack.push(ctxt);
+              stack.insert(0, (e, c_ctxt, c_stack));
+            }
+            Ok(())
+          }
+          _ => panic!("partial {} not found", base)
+        }
       },
 
       &box HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref escape, ref no_white_space, block: None}) => {
@@ -247,7 +287,7 @@ mod tests {
     let templ = Default::default();
     let mut buf: Vec<u8> = Vec::new();
 
-    eval(&templ, &json, &mut buf).unwrap();
+    eval(&templ, &json, &mut buf, &Default::default()).unwrap();
   }
 
 }

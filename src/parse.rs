@@ -174,7 +174,7 @@ rustlex! HBExpressionLexer {
 }
 
 #[deriving(Show)]
-enum HBValHolder {
+pub enum HBValHolder {
   String(String),
   Path(Vec<String>),
 }

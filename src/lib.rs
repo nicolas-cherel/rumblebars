@@ -11,6 +11,7 @@ pub use self::parse::ParseError;
 pub use self::parse::Template;
 pub use self::eval::eval;
 pub use self::eval::HBData;
+pub use self::eval::EvalContext;
 
 mod parse;
 mod eval;
