@@ -7,7 +7,7 @@ use parse::HBEntry;
 use parse::HBExpression;
 use parse::HBValHolder;
 
-fn get_val_for_key<'a>(data: &'a HBData, key_path: &Vec<String>, context_stack: &Vec<&'a HBData>) ->  Option<&'a (HBData + 'a)> {
+fn value_for_key_path<'a>(data: &'a HBData, key_path: &Vec<String>, context_stack: &Vec<&'a HBData>) ->  Option<&'a (HBData + 'a)> {
   let mut ctxt = Some(data);
   let mut stack_index = 0;
   
@@ -32,7 +32,7 @@ fn get_val_for_key<'a>(data: &'a HBData, key_path: &Vec<String>, context_stack: 
   return ctxt;
 }
 
-pub enum HBNodeType<Sized? T> {
+pub enum HBNodeType<T> {
   Branch(T),
   Array(T),
   Leaf(T),
@@ -40,21 +40,13 @@ pub enum HBNodeType<Sized? T> {
 }
 
 pub trait HBData {
-  fn value_for_key_path<'a>(&'a self, path: &Vec<String>, stack: &Vec<&'a HBData>) -> Option<&'a HBData>;
   fn write_value(&self, out: &mut Writer) -> Result<(), IoError>;
   fn typed_node<'a>(&'a self) -> HBNodeType<&'a HBData>;
   fn as_array<'a>(&'a self) -> Option<Vec<&'a HBData>>;
   fn get_key<'a>(&'a self, key: &str) -> Option<&'a HBData>;
 }
 
-
 impl HBData for Json {
-  fn value_for_key_path<'a>(&'a self, path: &Vec<String>, stack: &Vec<&'a HBData>) -> Option<&'a HBData> {
-    return match get_val_for_key(self, path, stack) {
-      Some(v) => Some(v),
-      _ => None,
-    };
-  }
 
   fn typed_node<'a>(&'a self) -> HBNodeType<&'a HBData> {
     return match self {
@@ -144,7 +136,7 @@ pub fn eval(template: &Template, data: &HBData, out: &mut Writer, eval_context: 
         match eval_context.partial_with_name(base.get(0).unwrap().as_slice()) {
           Some(t) => {
             let c_ctxt = if let Some(&HBValHolder::Path(ref p)) = params.get(0) {
-              ctxt.value_for_key_path(p, &ctxt_stack).unwrap_or(ctxt)
+              value_for_key_path(ctxt, p, &ctxt_stack).unwrap_or(ctxt)
             } else {
               ctxt
             };
@@ -161,7 +153,7 @@ pub fn eval(template: &Template, data: &HBData, out: &mut Writer, eval_context: 
       },
 
       &box HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref escape, ref no_white_space, block: None}) => {
-        match ctxt.value_for_key_path(base, &ctxt_stack) {
+        match value_for_key_path(ctxt, base, &ctxt_stack) {
           Some(v) => match v.typed_node() {
             HBNodeType::Leaf(_) => v.write_value(out),
             _ => Ok(()),
@@ -171,7 +163,7 @@ pub fn eval(template: &Template, data: &HBData, out: &mut Writer, eval_context: 
       },
 
       &box HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref escape, ref no_white_space, ref block}) => {
-        let c_ctxt = ctxt.value_for_key_path(base, &ctxt_stack);
+        let c_ctxt = value_for_key_path(ctxt, base, &ctxt_stack);
 
         match (c_ctxt, block) {
           (Some(c), &Some(ref block_found)) => {
@@ -216,6 +208,7 @@ mod tests {
   use serialize::json;
   use std::default::Default;
 
+  use super::value_for_key_path;
   use super::HBData;
   use super::eval;
 
@@ -224,7 +217,7 @@ mod tests {
     let json = json::from_str(r##"{"a": 1}"##).unwrap();
     let mut buf: Vec<u8> = Vec::new();
 
-    json.value_for_key_path(&vec!["a".to_string()], &vec![]).unwrap().write_value(&mut buf).unwrap();
+    value_for_key_path(&json, &vec!["a".to_string()], &vec![]).unwrap().write_value(&mut buf).unwrap();
 
     assert_eq!(String::from_utf8(buf).unwrap(), "1".to_string());
   }
@@ -234,7 +227,7 @@ mod tests {
     let json = json::from_str(r##"{"a": {"b": 1}}"##).unwrap();
     let mut buf: Vec<u8> = Vec::new();
 
-    json.value_for_key_path(&vec!["a".to_string(), "b".to_string()], &vec![]).unwrap().write_value(&mut buf).unwrap();
+    value_for_key_path(&json, &vec!["a".to_string(), "b".to_string()], &vec![]).unwrap().write_value(&mut buf).unwrap();
 
     assert_eq!(String::from_utf8(buf).unwrap(), "1".to_string());
   }
@@ -244,7 +237,7 @@ mod tests {
     let json = json::from_str(r##"{"a": [1, 2, 3]}"##).unwrap();
     let mut buf: Vec<u8> = Vec::new();
 
-    json.value_for_key_path(&vec!["a".to_string(), "0".to_string()], &vec![]).unwrap().write_value(&mut buf).unwrap();
+    value_for_key_path(&json, &vec!["a".to_string(), "0".to_string()], &vec![]).unwrap().write_value(&mut buf).unwrap();
 
     assert_eq!(String::from_utf8(buf).unwrap(), "1".to_string());
   }
@@ -254,7 +247,7 @@ mod tests {
     let json = json::from_str(r##""hello""##).unwrap();
     let mut buf: Vec<u8> = Vec::new();
 
-    json.value_for_key_path(&vec![".".to_string()], &vec![]).unwrap().write_value(&mut buf).unwrap();
+    value_for_key_path(&json, &vec![".".to_string()], &vec![]).unwrap().write_value(&mut buf).unwrap();
 
     assert_eq!(String::from_utf8(buf).unwrap(), "hello".to_string());
   }
@@ -264,7 +257,7 @@ mod tests {
     let json = json::from_str(r##"{"t": "hello"}"##).unwrap();
     let mut buf: Vec<u8> = Vec::new();
 
-    json.value_for_key_path(&vec![".".to_string(), "t".to_string()], &vec![]).unwrap().write_value(&mut buf).unwrap();
+    value_for_key_path(&json, &vec![".".to_string(), "t".to_string()], &vec![]).unwrap().write_value(&mut buf).unwrap();
 
     assert_eq!(String::from_utf8(buf).unwrap(), "hello".to_string());
   }
@@ -273,7 +266,7 @@ mod tests {
   fn deep_path_none() {
     let json = json::from_str(r##"{"a": 1}"##).unwrap();
 
-    match json.value_for_key_path(&vec!["a".to_string(), "b".to_string()], &vec![]) {
+    match value_for_key_path(&json, &vec!["a".to_string(), "b".to_string()], &vec![]) {
       Some(_) => assert!(false),
       None    => assert!(true),
     }
