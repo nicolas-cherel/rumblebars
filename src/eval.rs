@@ -39,8 +39,10 @@ pub enum HBNodeType<T> {
   Null,
 }
 
+pub type HBEvalResult = Result<(), IoError>;
+
 pub trait HBData {
-  fn write_value(&self, out: &mut Writer) -> Result<(), IoError>;
+  fn write_value(&self, out: &mut Writer) -> HBEvalResult;
   fn typed_node<'a>(&'a self) -> HBNodeType<&'a HBData>;
   fn as_array<'a>(&'a self) -> Option<Vec<&'a HBData>>;
   fn get_key<'a>(&'a self, key: &str) -> Option<&'a HBData>;
@@ -57,7 +59,7 @@ impl HBData for Json {
     }
   }
 
-  fn write_value(&self, out: &mut Writer) -> Result<(), IoError> {
+  fn write_value(&self, out: &mut Writer) -> HBEvalResult {
     return match self {
       &Json::I64(ref i)     => write!(out, "{}", i),
       &Json::U64(ref u)     => write!(out, "{}", u),
@@ -98,31 +100,34 @@ impl HBData for Json {
   }
 }
 
-pub struct HelperOptions;
-pub trait Helper {
-  fn call(&self, context: &HBData, options: &HelperOptions, out: &mut Writer) -> Result<(), IoError>;
+type HBPartialFunction =  fn(hb_context: &EvalContext, context: &HBData, out: &mut Writer, params: &[&HBData]) -> HBEvalResult;
+
+pub struct Helper {
+  funkt: HBPartialFunction,
+  inv: HBPartialFunction,
 }
 
 #[deriving(Default)]
-pub struct EvalContext<'a> {
-  partials: HashMap<&'a str, &'a Template>,
-  helpers: HashMap<&'a str, &'a (Helper + 'a)>,
+pub struct EvalContext {
+  partials: HashMap<String, Template>,
+  helpers: HashMap<String, Helper>,
 }
 
-impl <'a> EvalContext<'a> {
-  pub fn register_partial(&mut self, name: &'a str, t: &'a Template) {
+impl EvalContext {
+  pub fn register_partial(&mut self, name: String, t: Template) {
     self.partials.insert(name, t);
   }
 
-  fn partial_with_name(&self, name: &str) -> Option<&Template> {
-    return match self.partials.get(name) {
-      Some(&t) => Some(t),
-      None => None,
-    }
+  pub fn partial_with_name(&self, name: &str) -> Option<&Template> {
+    return self.partials.get(name);
+  }
+
+  pub fn helper_with_name(&self, name: &str) -> Option<&Helper> {
+    return self.helpers.get(name);
   }
 }
 
-pub fn eval(template: &Template, data: &HBData, out: &mut Writer, eval_context: &EvalContext) -> Result<(), IoError> {
+pub fn eval(template: &Template, data: &HBData, out: &mut Writer, eval_context: &EvalContext) -> HBEvalResult {
   let mut stack:Vec<_> = FromIterator::from_iter(template.iter().map(|e| {
     (e, data, Vec::new())
   }));

@@ -93,7 +93,7 @@ fn partial_test() {
   let mut eval_ctxt: EvalContext = Default::default();
   let mut buf: Vec<u8> = Vec::new();
 
-  eval_ctxt.register_partial("test", &partial);
+  eval_ctxt.register_partial("test".to_string(), partial);
 
   eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
@@ -109,8 +109,8 @@ fn partial_block_test() {
   let mut eval_ctxt: EvalContext = Default::default();
   let mut buf: Vec<u8> = Vec::new();
 
-  eval_ctxt.register_partial("test", &partial);
-  eval_ctxt.register_partial("check", &partial_check);
+  eval_ctxt.register_partial("test".to_string(), partial);
+  eval_ctxt.register_partial("check".to_string(), partial_check);
 
   eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
