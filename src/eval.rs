@@ -100,7 +100,22 @@ impl HBData for Json {
   }
 }
 
-type HBPartialFunction =  fn(hb_context: &EvalContext, context: &HBData, out: &mut Writer, params: &[&HBData]) -> HBEvalResult;
+impl HBData for String {
+  fn write_value(&self, out: &mut Writer) -> HBEvalResult {
+    write!(out, "{}", self)
+  }
+
+  fn typed_node<'a>(&'a self) -> HBNodeType<&'a HBData> {
+    HBNodeType::Leaf(self as &HBData)
+  }
+
+  fn as_bool(&self) -> bool { self.as_slice() == "" }
+
+  fn as_array<'a>(&'a self) -> Option<Vec<&'a HBData>> { None }
+  fn get_key<'a>(&'a self, _: &str) -> Option<&'a HBData> { None }
+}
+
+pub type HBHelperFunction = fn(params: &[&HBData], options: &HelperOptions, out: &mut Writer, hb_context: &EvalContext) -> HBEvalResult;
 
 pub struct Helper {
   funkt: HBPartialFunction,
