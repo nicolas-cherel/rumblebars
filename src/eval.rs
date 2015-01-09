@@ -1,6 +1,7 @@
 use std::io::{IoError, Writer};
 use serialize::json::Json;
 use std::collections::HashMap;
+use std::num::Float;
 
 use parse::Template;
 use parse::HBEntry;
@@ -46,6 +47,7 @@ pub trait HBData {
   fn typed_node<'a>(&'a self) -> HBNodeType<&'a HBData>;
   fn as_array<'a>(&'a self) -> Option<Vec<&'a HBData>>;
   fn get_key<'a>(&'a self, key: &str) -> Option<&'a HBData>;
+  fn as_bool(&self) -> bool;
 }
 
 impl HBData for Json {
@@ -98,6 +100,19 @@ impl HBData for Json {
       _ => None,
     }
   }
+
+  fn as_bool(&self) -> bool {
+    return match self {
+      &Json::I64(ref i)     => *i == 0,
+      &Json::U64(ref u)     => *u == 0,
+      &Json::F64(ref f)     => (*f == Float::nan() || *f == 0.0),
+      &Json::String(ref s)  => s.as_slice() == "",
+      &Json::Boolean(ref b) => *b,
+      &Json::Null           => false,
+      _  => true,
+    }
+  }
+
 }
 
 impl HBData for String {
@@ -117,10 +132,138 @@ impl HBData for String {
 
 pub type HBHelperFunction = fn(params: &[&HBData], options: &HelperOptions, out: &mut Writer, hb_context: &EvalContext) -> HBEvalResult;
 
+#[deriving(Copy)]
 pub struct Helper {
-  funkt: HBPartialFunction,
-  inv: HBPartialFunction,
+  helper_func: HBHelperFunction,
 }
+
+pub type HelperOptionsByName<'a> = HashMap<&'a String, &'a (HBData + 'a)>;
+
+// alow dead, only used from user defined helpers
+#[allow(dead_code)]
+pub struct HelperOptions<'a> {
+  block: Option<&'a Template>,
+  inverse: Option<&'a Template>,
+  pub context: &'a (HBData + 'a),
+  hb_context: &'a EvalContext,
+  pub condition: bool,
+  options: HelperOptionsByName<'a>,
+}
+
+// alow dead, only used from user defined helpers
+#[allow(dead_code)]
+impl <'a> HelperOptions<'a> {
+  fn render_template(&self, t: &Template, out: &mut Writer) -> HBEvalResult {
+    eval(t, self.context, out, self.hb_context)
+  }
+
+  pub fn option_by_name(&self, name: &String) -> Option<&'a(HBData + 'a)> {
+    match self.options.get(name) {
+      Some(&v) => Some(v),
+      None => None
+    }
+  }
+
+  pub fn block_ok(&self, out: &mut Writer) -> HBEvalResult{
+    match self.block {
+      Some(t) => self.render_template(t, out),
+      None    => Ok(()),
+    }
+  }
+
+  pub fn inverse(&self, out: &mut Writer) -> HBEvalResult{
+    match self.inverse {
+      Some(t) => self.render_template(t, out),
+      None    => Ok(()),
+    }
+  }
+}
+
+impl Helper {
+  pub fn new_with_function(f: HBHelperFunction) -> Helper {
+    Helper { helper_func: f }
+  }
+
+  fn build_param_vec<'a, 'b>(context: &'a HBData, params: &'a [HBValHolder], ctxt_stack: &'b Vec<&'a HBData>) -> Vec<&'a (HBData + 'a)> {
+    let mut evaluated_params: Vec<&HBData> = vec![];
+    for v in params.iter() {
+      match v {
+        &HBValHolder::String(ref s) => evaluated_params.push(s as &HBData),
+        &HBValHolder::Path(ref p) => if let Some(d) = value_for_key_path(context, p, ctxt_stack) {
+          evaluated_params.push(d)
+        },
+      }
+    }; 
+
+    evaluated_params   
+  }
+
+  fn build_options_map<'a, 'b>(context:&'a HBData, options: &'a [(String, HBValHolder)], ctxt_stack: &'b Vec<&'a HBData>) -> HelperOptionsByName<'a> {
+    let mut options_iter = options.iter().map(|&(ref name, ref val)| {
+      match val {
+        &HBValHolder::String(ref s) => Some((name, s as &HBData)),
+        &HBValHolder::Path(ref p) => {
+          if let Some(v) = value_for_key_path(context, p, ctxt_stack) {
+            Some((name, v))
+          } else {
+            None
+          }
+        }
+      }
+    });
+
+    let mut h = HashMap::new();
+    for i in options_iter {
+      match i {
+        Some((n, v)) => h.insert(n, v),
+        None => None,
+      };
+    }
+
+    h
+  }
+
+  fn call_for_block<'a, 'b, 'c>(&self, block: Option<&'a Template>, inverse: Option<&'a Template>, context: &'a HBData, params: &'a [HBValHolder], options: &'a [(String, HBValHolder)], out: &'b mut Writer, hb_context: &'a EvalContext, ctxt_stack: &'c Vec<&'a HBData>) -> HBEvalResult {
+    
+    let condition = match params.as_slice() {
+      [ref val, ..] => match val {
+        &HBValHolder::String(ref s) => s.as_bool(),
+        &HBValHolder::Path(ref p) => if let Some(v) = value_for_key_path(context, p, ctxt_stack) {
+          v.as_bool()
+        } else {
+          false
+        }
+      },
+      _ => false
+    };
+
+    let helper_options = HelperOptions { 
+      block: block, 
+      inverse: inverse, 
+      context: context, 
+      hb_context: hb_context,
+      condition: condition,
+      options: Helper::build_options_map(context, options, ctxt_stack),
+    };
+
+    (self.helper_func)(Helper::build_param_vec(context, params, ctxt_stack).as_slice(), &helper_options, out, hb_context)
+  }
+
+  fn call_fn<'a, 'b, 'c>(&self, context: &'a HBData, params: &'a [HBValHolder], options: &'a [(String, HBValHolder)], out: &'b mut Writer, hb_context: &'a EvalContext,  ctxt_stack: &'c Vec<&'a HBData>) -> HBEvalResult {
+    let helper_options = HelperOptions { 
+      block: None, 
+      inverse: None, 
+      context: context, 
+      hb_context: hb_context,
+      condition: true,
+      options: Helper::build_options_map(context, options, ctxt_stack),
+    };
+
+    (self.helper_func)(Helper::build_param_vec(context, params, ctxt_stack).as_slice(), &helper_options, out, hb_context)
+  }
+  
+}
+
 
 #[deriving(Default)]
 pub struct EvalContext {
@@ -137,8 +280,16 @@ impl EvalContext {
     return self.partials.get(name);
   }
 
+  pub fn register_helper(&mut self, name: String, h: Helper) {
+    self.helpers.insert(name, h);
+  }
+
   pub fn helper_with_name(&self, name: &str) -> Option<&Helper> {
     return self.helpers.get(name);
+  }
+
+  pub fn has_helper_with_name(&self, name: &str) -> bool {
+    return self.helpers.contains_key(name);
   }
 }
 
@@ -167,50 +318,75 @@ pub fn eval(template: &Template, data: &HBData, out: &mut Writer, eval_context: 
               stack.insert(0, (e, c_ctxt, c_stack));
             }
             Ok(())
-          }
+          },
           _ => panic!("partial {} not found", base)
         }
       },
 
-      &box HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref escape, ref no_white_space, block: None}) => {
-        match value_for_key_path(ctxt, base, &ctxt_stack) {
-          Some(v) => match v.typed_node() {
-            HBNodeType::Leaf(_) => v.write_value(out),
-            _ => Ok(()),
+      &box HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref render_options, block: None, else_block: None}) => {
+        match base.as_slice() {
+          [ref single] if eval_context.has_helper_with_name(single.as_slice()) => {
+            let helper = eval_context.helper_with_name(single.as_slice()).unwrap();
+            // let helper_params = 
+            helper.call_fn(ctxt, params.as_slice(), options.as_slice(), out, eval_context, &ctxt_stack)
           },
-          None => Ok(()),
+          _ => match value_for_key_path(ctxt, base, &ctxt_stack) {
+            Some(v) => match v.typed_node() {
+              HBNodeType::Leaf(_) => v.write_value(out),
+              _ => Ok(()),
+            },
+            None => Ok(()),
+          }
         }
       },
 
-      &box HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref escape, ref no_white_space, ref block}) => {
-        let c_ctxt = value_for_key_path(ctxt, base, &ctxt_stack);
+      &box HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref render_options, ref block, ref else_block}) => {
+        match base.as_slice() {
+          [ref single] if eval_context.has_helper_with_name(single.as_slice()) => {
+            let helper = eval_context.helper_with_name(single.as_slice()).unwrap();
+            let blocks: Vec<_> = FromIterator::from_iter([block, else_block].iter().map(|b| {
+              match b {
+                &&Some(box ref t) => Some(t),
+                &&None => None,
+              }
+            }));
+            if let [opt_block, opt_else_block] = blocks.as_slice() {
+              helper.call_for_block(opt_block , opt_else_block, ctxt, params.as_slice(), options.as_slice(), out, eval_context, &ctxt_stack)
+            } else {
+              Ok(())
+            }
+          },
+          _ => {
+            let c_ctxt = value_for_key_path(ctxt, base, &ctxt_stack);
 
-        match (c_ctxt, block) {
-          (Some(c), &Some(ref block_found)) => {
-            match c.typed_node() {
-              HBNodeType::Branch(_) => {
-                for e in block_found.iter().rev() {
-                  let mut c_stack = ctxt_stack.clone();
-                  c_stack.push(ctxt);
-                  stack.insert(0, (e, c, c_stack));
-                }                
-              },
-              HBNodeType::Array(a) => {
-                if let Some(collection) = a.as_array() {
-                  for array_i in collection.iter().rev() {
+            match (c_ctxt, block) {
+              (Some(c), &Some(ref block_found)) => {
+                match c.typed_node() {
+                  HBNodeType::Branch(_) => {
                     for e in block_found.iter().rev() {
                       let mut c_stack = ctxt_stack.clone();
                       c_stack.push(ctxt);
-                      stack.insert(0, (e, *array_i, c_stack));
-                    }   
-                  }
+                      stack.insert(0, (e, c, c_stack));
+                    }                
+                  },
+                  HBNodeType::Array(a) => {
+                    if let Some(collection) = a.as_array() {
+                      for array_i in collection.iter().rev() {
+                        for e in block_found.iter().rev() {
+                          let mut c_stack = ctxt_stack.clone();
+                          c_stack.push(ctxt);
+                          stack.insert(0, (e, *array_i, c_stack));
+                        }   
+                      }
+                    }
+                  },
+                  _ => (),
                 }
-              }
-              _ => (),
+              },
+              _ => ()
             }
             Ok(())
           },
-          _ => Ok(()),
         }
       },
     };

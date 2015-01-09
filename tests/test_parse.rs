@@ -30,7 +30,8 @@ fn big_no_err() {
     {{t "… param1" well.[that my baby].[1] ~}}
   "##);
   
-  assert!((match t { Ok(_) => true, Err(_) => false }))
+
+  assert!((match t { Ok(_) => true, Err(e) => { println!("{}", e); false }}))
 
 }
 
