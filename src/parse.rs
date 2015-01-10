@@ -309,10 +309,11 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
   let mut lexer = HandleBarsLexer::new(BufReader::new(template.as_bytes()));
   let mut raw = String::new();
 
-  // parse stack entry tuple: (template, ignore heading space, ignore trailing space, expect else block)
-  let mut stack = vec![(box Template { content: vec![] }, false, false, false)];
+  // parse stack entry tuple: (template, expect else block)
+  let mut stack = vec![(box Template { content: vec![] }, false)];
 
   let mut sink_leading_white_space = false;
+  let mut sink_trailing_white_space = false;
   let mut wp_back_track = String::new();
   let wp_regex = Regex::new(r"([:blank:]|\n)").unwrap();
 
@@ -327,7 +328,7 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
               wp_back_track.push_str(chr.as_slice());
             } else {
               sink_leading_white_space = false;
-              debug!("push '{}' into '{}'", chr, raw);
+
               if ! wp_back_track.is_empty() {
                 raw.push_str(wp_back_track.as_slice());
                 wp_back_track = String::new();
@@ -339,16 +340,17 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
         
       },
       TokSimpleExp(_) | TokNoEscapeExp(_) | TokBlockExp(_) | TokBlockEndExp(_) | TokPartialExp(_) | TokBlockElseCond(_) => {
-        if ! stack.last_mut().unwrap().2 && ! wp_back_track.is_empty() {
+        if !sink_trailing_white_space && ! wp_back_track.is_empty() {
           raw.push_str(wp_back_track.as_slice());
         }
-        
+
         wp_back_track = String::new();
 
         if ! raw.is_empty() {
           stack.last_mut().unwrap().0.content.push(box HBEntry::Raw(raw));
           raw = String::new();
         }
+        sink_trailing_white_space = false
       },
     }
 
@@ -373,27 +375,26 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
       },
       TokBlockExp(exp) => {
         if let Ok(hb) = parse_hb_expression(exp.as_slice()) {
-          let (no_leading_whitespace, no_trailing_whitespace) = (
-            hb.render_options.no_leading_whitespace, 
-            hb.render_options.no_trailing_whitespace
-          );
-          sink_leading_white_space = no_leading_whitespace;
+          sink_leading_white_space  = hb.render_options.no_leading_whitespace;
+          sink_trailing_white_space = hb.render_options.no_trailing_whitespace;
           stack.last_mut().unwrap().0.content.push(box HBEntry::Eval(hb));
-          stack.push((box Template { content: vec![] }, no_leading_whitespace, no_trailing_whitespace, false));
+          stack.push((box Template { content: vec![] }, false));
         }
       },
       TokBlockElseCond(exp) => {
         if let Ok(hb) = parse_hb_expression(exp.as_slice()) {
-          sink_leading_white_space = hb.render_options.no_leading_whitespace;
-          stack.push((box Template { content: vec![] }, hb.render_options.no_leading_whitespace, hb.render_options.no_trailing_whitespace, true));
+          sink_leading_white_space  = hb.render_options.no_leading_whitespace;
+          sink_trailing_white_space = hb.render_options.no_trailing_whitespace;
+          stack.push((box Template { content: vec![] }, true));
         }
       },
       TokBlockEndExp(exp) => {
         if let Ok(hb) = parse_hb_expression(exp.as_slice()) {
-
+          sink_leading_white_space  = hb.render_options.no_leading_whitespace;
+          sink_trailing_white_space = hb.render_options.no_trailing_whitespace;
           // inspect stack for else template block
           let has_else = match stack.as_slice() {
-            [_, (_, _, _, false), (_, _, _, true)] => true,
+            [_, (_, false), ( _, true)] => true,
             _ => false,
           };
 
@@ -407,9 +408,9 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
             Some(&box HBEntry::Eval(ref mut parent)) => {
               if parent.base == hb.base {
                 match pop {
-                  (some_else, Some((block, _, _, _))) => {
+                  (some_else, Some((block, _))) => {
                     parent.block = Some(block);
-                    if let Some((else_block, _, _, _)) = some_else {
+                    if let Some((else_block, _)) = some_else {
                       parent.else_block = Some(else_block);
                     }
                   },
@@ -428,7 +429,7 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
 
   }
 
-  if ! stack.last_mut().unwrap().2 && ! wp_back_track.is_empty() {
+  if !sink_trailing_white_space && ! wp_back_track.is_empty() {
     raw.push_str(wp_back_track.as_slice());
   }
 
@@ -437,7 +438,7 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
   }
 
   return match stack.remove(0) {
-    Some((box t, _, _, _)) => Result::Ok(t),
+    Some((box t, _)) => Result::Ok(t),
     None        => Result::Err((ParseError::UnkownError, None)),
   };
 }

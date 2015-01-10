@@ -249,6 +249,45 @@ fn trailing_whitespace() {
   assert_eq!(String::from_utf8(buf).unwrap(), expected.to_string()); 
 }
 
+#[test]
+fn both_whitespace() {
+  let json = json::from_str(r##"{"p": {}}"##).unwrap();
+  let tmpl = parse(r##"{{~#p~}}
+
+      Pouet pouet
+
+      {{/p}}"##).unwrap();
+  let mut eval_ctxt: EvalContext = Default::default();
+  let mut buf: Vec<u8> = Vec::new();
+
+  eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
+
+  let expected = r##"Pouet pouet"##;
+
+  assert_eq!(String::from_utf8(buf).unwrap(), expected.to_string()); 
+}
+
+
+#[test]
+fn nested_whitespace() {
+  let json = json::from_str(r##"{"p": {"u": {}}}"##).unwrap();
+  let tmpl = parse(r##"{{~#p~}}
+
+      {{#u~}} Uuuuu {{/u~}}
+      ooOOOO
+      {{/p}}"##).unwrap();
+  let mut eval_ctxt: EvalContext = Default::default();
+  let mut buf: Vec<u8> = Vec::new();
+
+  eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
+
+  let expected = r##" Uuuuu
+      ooOOOO"##;
+
+  assert_eq!(String::from_utf8(buf).unwrap(), expected.to_string()); 
+}
+
+
 
 
 
