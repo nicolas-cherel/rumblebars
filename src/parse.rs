@@ -1,6 +1,7 @@
 use std::io::BufReader;
 use std::io::Writer;
 use std::slice;
+use regex::Regex;
 
 use self::Token::{TokSimpleExp, TokNoEscapeExp, TokBlockExp, TokBlockElseCond, TokBlockEndExp, TokPartialExp, TokRaw};
 use self::HBToken::{TokPathEntry,TokNoWhiteSpaceBefore, TokNoWhiteSpaceAfter,TokStringParam,TokParamStart, TokParamSep, TokOption};
@@ -12,7 +13,7 @@ enum Token {
   TokNoEscapeExp(String),
   TokPartialExp(String),
   TokBlockExp(String),
-  TokBlockElseCond,
+  TokBlockElseCond(String),
   TokBlockEndExp(String),
   TokRaw(String),
 }
@@ -54,7 +55,7 @@ rustlex! HandleBarsLexer {
     NO_ESC_EXP   => |lexer:&mut HandleBarsLexer<R>| Some( TokNoEscapeExp( lexer.yystr() ) )
     END_EXP      => |lexer:&mut HandleBarsLexer<R>| Some( TokBlockEndExp( lexer.yystr() ) )
     BLOCK_EXP    => |lexer:&mut HandleBarsLexer<R>| Some( TokBlockExp( lexer.yystr() ) )
-    ELSE_EXP     => |    _:&mut HandleBarsLexer<R>| Some( TokBlockElseCond )
+    ELSE_EXP     => |lexer:&mut HandleBarsLexer<R>| Some( TokBlockElseCond( lexer.yystr() ) )
     
 }
 
@@ -188,8 +189,8 @@ pub enum HBValHolder {
 #[deriving(Show)]
 pub struct RenderOptions {
   pub escape: bool,
-  pub no_white_space_before: bool,
-  pub no_white_space_after: bool,
+  pub no_leading_whitespace: bool,
+  pub no_trailing_whitespace: bool,
 }
 
 #[deriving(Show)]
@@ -232,7 +233,7 @@ impl Copy for ParseError {}
 
 fn parse_hb_expression(exp: &str) -> Result<HBExpression, (ParseError, Option<String>)> {
   let mut lexer = HBExpressionLexer::new(BufReader::new(exp.as_bytes()));
-  let mut render_options = RenderOptions {escape: false, no_white_space_before: false, no_white_space_after: false};
+  let mut render_options = RenderOptions {escape: false, no_leading_whitespace: false, no_trailing_whitespace: false};
 
   let mut path = vec![];
   let mut params = vec![];
@@ -241,8 +242,8 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpression, (ParseError, Option<St
 
   while let Some(tok) = lexer.next() {
     match tok {
-      TokNoWhiteSpaceBefore   => { render_options.no_white_space_before = false },
-      TokNoWhiteSpaceAfter    => { render_options.no_white_space_after = true },
+      TokNoWhiteSpaceBefore   => { render_options.no_leading_whitespace = true },
+      TokNoWhiteSpaceAfter    => { render_options.no_trailing_whitespace = true },
       TokPathEntry(path_comp) => { path.push(path_comp) },
 
       TokParamStart => {
@@ -273,7 +274,7 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpression, (ParseError, Option<St
                     opt_val = Some(s);
                     break;
                   },
-                  TokNoWhiteSpaceAfter => { render_options.no_white_space_after = true },
+                  TokNoWhiteSpaceAfter => { render_options.no_trailing_whitespace = true },
                   _ => { break }
                 }
               }
@@ -281,7 +282,7 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpression, (ParseError, Option<St
               options.push((option_name, if let Some(val) = opt_val { HBValHolder::String(val) } else { HBValHolder::Path(opt_path) }));
 
             },
-            TokNoWhiteSpaceAfter => { render_options.no_white_space_after = true },
+            TokNoWhiteSpaceAfter => { render_options.no_trailing_whitespace = true },
             _ => { break; }
           }
         }
@@ -304,18 +305,46 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpression, (ParseError, Option<St
   })
 }
 
-
 pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
   let mut lexer = HandleBarsLexer::new(BufReader::new(template.as_bytes()));
   let mut raw = String::new();
-  let mut stack = vec![(box Template { content: vec![] }, false)];
-  let mut ignore_after_white_space = false;
+
+  // parse stack entry tuple: (template, ignore heading space, ignore trailing space, expect else block)
+  let mut stack = vec![(box Template { content: vec![] }, false, false, false)];
+
+  let mut sink_leading_white_space = false;
+  let mut wp_back_track = String::new();
+  let wp_regex = Regex::new(r"([:blank:]|\n)").unwrap();
 
   for tok in *lexer {
     // first match handle raw content
     match tok {
-      TokRaw(ref chr) => raw.push_str(chr.as_slice()),
-      TokSimpleExp(_) | TokNoEscapeExp(_) | TokBlockExp(_) | TokBlockEndExp(_) | TokPartialExp(_) | TokBlockElseCond => {
+      TokRaw(ref chr) => {
+        match (sink_leading_white_space, wp_regex.is_match(chr.as_slice())) {
+          (true, true) => (),
+          (_, use_backtrack) => {
+            if use_backtrack {
+              wp_back_track.push_str(chr.as_slice());
+            } else {
+              sink_leading_white_space = false;
+              debug!("push '{}' into '{}'", chr, raw);
+              if ! wp_back_track.is_empty() {
+                raw.push_str(wp_back_track.as_slice());
+                wp_back_track = String::new();
+              }
+              raw.push_str(chr.as_slice());
+            }
+          }
+        }
+        
+      },
+      TokSimpleExp(_) | TokNoEscapeExp(_) | TokBlockExp(_) | TokBlockEndExp(_) | TokPartialExp(_) | TokBlockElseCond(_) => {
+        if ! stack.last_mut().unwrap().2 && ! wp_back_track.is_empty() {
+          raw.push_str(wp_back_track.as_slice());
+        }
+        
+        wp_back_track = String::new();
+
         if ! raw.is_empty() {
           stack.last_mut().unwrap().0.content.push(box HBEntry::Raw(raw));
           raw = String::new();
@@ -344,19 +373,27 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
       },
       TokBlockExp(exp) => {
         if let Ok(hb) = parse_hb_expression(exp.as_slice()) {
+          let (no_leading_whitespace, no_trailing_whitespace) = (
+            hb.render_options.no_leading_whitespace, 
+            hb.render_options.no_trailing_whitespace
+          );
+          sink_leading_white_space = no_leading_whitespace;
           stack.last_mut().unwrap().0.content.push(box HBEntry::Eval(hb));
-          stack.push((box Template { content: vec![] }, false));
+          stack.push((box Template { content: vec![] }, no_leading_whitespace, no_trailing_whitespace, false));
         }
       },
-      TokBlockElseCond => {
-        stack.push((box Template { content: vec![] }, true));
+      TokBlockElseCond(exp) => {
+        if let Ok(hb) = parse_hb_expression(exp.as_slice()) {
+          sink_leading_white_space = hb.render_options.no_leading_whitespace;
+          stack.push((box Template { content: vec![] }, hb.render_options.no_leading_whitespace, hb.render_options.no_trailing_whitespace, true));
+        }
       },
       TokBlockEndExp(exp) => {
         if let Ok(hb) = parse_hb_expression(exp.as_slice()) {
 
           // inspect stack for else template block
           let has_else = match stack.as_slice() {
-            [_, (_, false), (_, true)] => true,
+            [_, (_, _, _, false), (_, _, _, true)] => true,
             _ => false,
           };
 
@@ -370,9 +407,9 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
             Some(&box HBEntry::Eval(ref mut parent)) => {
               if parent.base == hb.base {
                 match pop {
-                  (some_else, Some((block, _))) => {
+                  (some_else, Some((block, _, _, _))) => {
                     parent.block = Some(block);
-                    if let Some((else_block, _)) = some_else {
+                    if let Some((else_block, _, _, _)) = some_else {
                       parent.else_block = Some(else_block);
                     }
                   },
@@ -391,12 +428,16 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
 
   }
 
+  if ! stack.last_mut().unwrap().2 && ! wp_back_track.is_empty() {
+    raw.push_str(wp_back_track.as_slice());
+  }
+
   if ! raw.is_empty() {
     stack.last_mut().unwrap().0.content.push(box HBEntry::Raw(raw));
   }
 
   return match stack.remove(0) {
-    Some((box t, _)) => Result::Ok(t),
+    Some((box t, _, _, _)) => Result::Ok(t),
     None        => Result::Err((ParseError::UnkownError, None)),
   };
 }
@@ -524,7 +565,7 @@ mod tests {
         assert_eq!(base, &vec!["t"]);
         assert_eq!(match params.get(0).unwrap() { &HBValHolder::String(ref s) => s.clone(), _ => "".to_string()}, "… param1".to_string());
         assert_eq!(match params.get(1).unwrap() { &HBValHolder::Path(ref p) => p.clone(), _ => vec![]}, vec!["well", "that my baby", "1"]);
-        assert!(render_options.no_white_space_after);
+        assert!(render_options.no_trailing_whitespace);
       },
       Err(_)  => (),
     }
@@ -540,7 +581,7 @@ mod tests {
           &(ref o, HBValHolder::Path(ref p)) => (o.clone(), p.clone()), 
           _ => ("".to_string(), vec![]),
         });
-        assert!(render_options.no_white_space_after);
+        assert!(render_options.no_trailing_whitespace);
       },
       Err(_)  => (),
     }
@@ -560,7 +601,7 @@ mod tests {
           &(ref o, HBValHolder::String(ref s)) => (o.clone(), s.clone()), 
           _ => ("".to_string(), "".to_string()),
         });
-        assert!(render_options.no_white_space_after);
+        assert!(render_options.no_trailing_whitespace);
       },
       Err(_)  => (),
     }
@@ -579,7 +620,7 @@ mod tests {
           &(ref o, HBValHolder::String(ref s)) => (o.clone(), s.clone()), 
           _ => ("".to_string(), "".to_string()),
         });
-        assert!(render_options.no_white_space_after);
+        assert!(render_options.no_trailing_whitespace);
       },
       Err(_)  => (),
     }

@@ -186,7 +186,7 @@ fn helper_val() {
   assert_eq!(String::from_utf8(buf).unwrap(), "value : toto".to_string()); 
 }
 
-fn cd(params: &[&HBData], options: &HelperOptions, out: &mut Writer, _: &EvalContext) -> HBEvalResult {
+fn cd(_: &[&HBData], options: &HelperOptions, out: &mut Writer, _: &EvalContext) -> HBEvalResult {
   if options.condition {
     options.block_ok(out)
   } else {
@@ -207,6 +207,49 @@ fn helper_cond() {
 
   assert_eq!(String::from_utf8(buf).unwrap(), "value : p true z false".to_string()); 
 }
+
+#[test]
+fn leading_whitespace() {
+  let json = json::from_str(r##"{"p": {}}"##).unwrap();
+  let tmpl = parse(r##"{{~#p}}
+
+      Pouet
+
+      {{/p}}"##).unwrap();
+  let mut eval_ctxt: EvalContext = Default::default();
+  let mut buf: Vec<u8> = Vec::new();
+
+  eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
+
+  let expected = r##"Pouet
+
+      "##;
+
+  assert_eq!(String::from_utf8(buf).unwrap(), expected.to_string()); 
+}
+
+
+#[test]
+fn trailing_whitespace() {
+  let json = json::from_str(r##"{"p": {}}"##).unwrap();
+  let tmpl = parse(r##"{{#p~}}
+
+      Pouet
+
+      {{/p}}"##).unwrap();
+  let mut eval_ctxt: EvalContext = Default::default();
+  let mut buf: Vec<u8> = Vec::new();
+
+  eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
+
+  let expected = r##"
+
+      Pouet"##;
+
+  assert_eq!(String::from_utf8(buf).unwrap(), expected.to_string()); 
+}
+
+
 
 
 

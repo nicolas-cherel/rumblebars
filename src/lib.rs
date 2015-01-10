@@ -5,6 +5,7 @@
 #[phase(plugin, link)] extern crate log;
 
 extern crate serialize;
+extern crate regex;
 
 pub use self::parse::parse;
 pub use self::parse::ParseError;
