@@ -2,6 +2,8 @@ use std::io::BufReader;
 use std::io::Writer;
 use std::slice;
 use regex::Regex;
+use std::default::Default;
+
 
 use self::Token::{TokSimpleExp, TokNoEscapeExp, TokBlockExp, TokBlockElseCond, TokBlockEndExp, TokPartialExp, TokRaw};
 use self::HBToken::{TokPathEntry,TokNoWhiteSpaceBefore, TokNoWhiteSpaceAfter,TokStringParam,TokParamStart, TokParamSep, TokOption};
@@ -158,7 +160,7 @@ rustlex! HBExpressionLexer {
     OPTION_NAME  => |lexer:&mut HBExpressionLexer<R>| {  
       lexer.in_options = true; 
       lexer.OPTION_VALUE(); 
-      Some( TokOption( lexer.yystr().as_slice().trim_right_chars('=').to_string() ) ) 
+      Some( TokOption( lexer.yystr().as_slice().trim_right_matches('=').to_string() ) ) 
     }
 
     // common expression ending 
@@ -182,7 +184,7 @@ rustlex! HBExpressionLexer {
   }
 
   OPTIONS {
-    OPTION_NAME  => |lexer:&mut HBExpressionLexer<R>| {  lexer.OPTION_VALUE(); Some( TokOption( lexer.yystr().as_slice().trim_right_chars('=').to_string() ) ) }
+    OPTION_NAME  => |lexer:&mut HBExpressionLexer<R>| {  lexer.OPTION_VALUE(); Some( TokOption( lexer.yystr().as_slice().trim_right_matches('=').to_string() ) ) }
     PARAMS_SEP    => |_:&mut HBExpressionLexer<R>| { None } 
 
     // common expression ending 
@@ -220,6 +222,15 @@ pub struct HBExpression {
   pub else_block: Option<Box<Template>>,
 }
 
+impl HBExpression {
+  pub fn path(&self) -> String {
+    let mut r = String::new();
+    self.base.iter().fold(&mut r, |mut a, i| {a.push_str(i.as_slice()); a.push('.'); a});
+
+    r
+  }
+}
+
 #[deriving(Show)]
 pub enum HBEntry {
   Raw(String),
@@ -235,6 +246,14 @@ pub struct Template {
 impl Template {
   pub fn iter<'a>(&'a self) -> slice::Iter<'a, Box<HBEntry>> {
     return self.content.iter();
+  }
+}
+
+impl Default for Template {
+  fn default() -> Template { 
+    Template { 
+      content: Default::default()
+    }
   }
 }
 
@@ -427,7 +446,7 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
           };
 
           match stack.last_mut().unwrap().0.content.last_mut() {
-            Some(&box HBEntry::Eval(ref mut parent)) => {
+            Some(&mut box HBEntry::Eval(ref mut parent)) => {
               if parent.base == hb.base {
                 match pop {
                   (some_else, Some((block, _))) => {
@@ -440,10 +459,12 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
                 }
                 
               } else {
-                return Err((ParseError::UnmatchedBlock, Some(format!("‘{}’ does not match ‘{}’", hb.base, parent.base))))
+                return Err((ParseError::UnmatchedBlock, Some(format!("‘{}’ does not match ‘{}’", hb.path(), parent.path()))))
               }
             }
-            _ => { return Err((ParseError::UnexpectedBlockClose, Some(format!("‘{}’ does not close any block", hb.base)))) } 
+            _ => { 
+              return Err((ParseError::UnexpectedBlockClose, Some(format!("‘{}’ does not close any block", hb.path())))) 
+            } 
           }
         }
       }
@@ -459,27 +480,32 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
     stack.last_mut().unwrap().0.content.push(box HBEntry::Raw(raw));
   }
 
-  return match stack.remove(0) {
-    Some((box t, _)) => Result::Ok(t),
-    None        => Result::Err((ParseError::UnkownError, None)),
-  };
+  if stack.len() > 0 {
+    Result::Ok(*stack.remove(0).0)
+  } else {
+    Result::Err((ParseError::UnkownError, None))
+  }
 }
 
 #[cfg(test)]
 mod tests {
   use std::io::BufReader;
-
+  use std::default::Default;
   use super::{parse, parse_hb_expression, HBEntry, HBExpression, HBValHolder, HBExpressionLexer};
 
-  #[allow(dead_code)]
-  fn debug_parse_hb(exp: &str) {
-    let mut lexer = HBExpressionLexer::new(BufReader::new(exp.as_bytes()));
-    println!("{}", exp);
-    for tok in *lexer {
-      println!("{}", tok);
-    }
+  // commented out due to the error
+  //   error: the trait `core::fmt::String` is not implemented for the type `parse::HBToken`
+  // for println!
 
-  }
+  // #[allow(dead_code)]
+  // fn debug_parse_hb(exp: &str) {
+  //   let mut lexer = HBExpressionLexer::new(BufReader::new(exp.as_bytes()));
+  //   println!("{}", exp);
+  //   for tok in *lexer {
+  //     println!("{}", tok);
+  //   }
+
+  // }
 
   #[test]
   fn hb_simple() {
@@ -651,7 +677,7 @@ mod tests {
 
   #[test]
   fn parse_raw() {
-    let p = parse("tada").unwrap();
+    let p = parse("tada").unwrap_or(Default::default());
     assert_eq!("tada", match p.content.get(0) {
       Some(&box HBEntry::Raw(ref s)) => s.as_slice(),
       _ => "",
@@ -660,9 +686,9 @@ mod tests {
 
   #[test]
   fn parse_exp() {
-    let p = parse("{{tada}}").unwrap();
+    let p = parse("{{tada}}").unwrap_or(Default::default());
     assert_eq!("tada", match p.content.get(0) {
-      Some(&box HBEntry::Eval(HBExpression {ref base, ..})) => base.head().unwrap().as_slice(),
+      Some(&box HBEntry::Eval(HBExpression {ref base, ..})) => base.iter().next().unwrap().as_slice(),
       _ => "",
     });
   }
@@ -670,7 +696,7 @@ mod tests {
   #[allow(unused_variables)]
   #[test]
   fn parse_else_block() {
-    let p = parse("{{#tada}}i{{else}}o{{/tada}}").unwrap();
+    let p = parse("{{#tada}}i{{else}}o{{/tada}}").unwrap_or(Default::default());;
     assert_eq!(true, match p.content.get(0) {
       Some(&box HBEntry::Eval(HBExpression {ref base, ref params, ref options, ref render_options, ref block, ref else_block})) => { 
         match (block, else_block) { (&Some(_), &Some(_)) => true, _ => false }
@@ -682,13 +708,13 @@ mod tests {
 
   #[test]
   fn parse_exp_entangled() {
-    let p = parse("tidi {{tada}} todo {{tudu}} bar").unwrap();
+    let p = parse("tidi {{tada}} todo {{tudu}} bar").unwrap_or(Default::default());;
     assert_eq!("tidi ", match p.content.get(0) {
       Some(&box HBEntry::Raw(ref s)) => s.as_slice(),
       _ => "",
     });
     assert_eq!("tada", match p.content.get(1) {
-      Some(&box HBEntry::Eval(HBExpression {ref base, ..})) => base.head().unwrap().as_slice(),
+      Some(&box HBEntry::Eval(HBExpression {ref base, ..})) => base.iter().next().unwrap().as_slice(),
       _ => "",
     });
     assert_eq!(" todo ", match p.content.get(2) {
@@ -696,7 +722,7 @@ mod tests {
       _ => "",
     });
     assert_eq!("tudu", match p.content.get(3) {
-      Some(&box HBEntry::Eval(HBExpression {ref base, ..})) => base.head().unwrap().as_slice(),
+      Some(&box HBEntry::Eval(HBExpression {ref base, ..})) => base.iter().next().unwrap().as_slice(),
       _ => "",
     });
     assert_eq!(" bar", match p.content.get(4) {

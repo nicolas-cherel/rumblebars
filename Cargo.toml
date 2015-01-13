@@ -4,5 +4,5 @@ version = "0.0.1"
 authors = ["Nicolas Cherel"]
 
 [dependencies.rustlex]
-git = "https://github.com/LeoTestard/rustlex"
-# git = "https://github.com/kali/rustlex"
+# git = "https://github.com/LeoTestard/rustlex"
+git = "https://github.com/kali/rustlex"

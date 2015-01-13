@@ -2,6 +2,8 @@ use std::io::{IoError, Writer};
 use serialize::json::Json;
 use std::collections::HashMap;
 use std::num::Float;
+use std::vec::Vec;
+use std::default::Default;
 
 use parse::Template;
 use parse::HBEntry;
@@ -42,6 +44,8 @@ pub enum HBNodeType<T> {
 
 pub type HBEvalResult = Result<(), IoError>;
 
+
+
 pub trait HBData {
   fn write_value(&self, out: &mut Writer) -> HBEvalResult;
   fn typed_node<'a>(&'a self) -> HBNodeType<&'a HBData>;
@@ -75,7 +79,7 @@ impl HBData for Json {
   fn as_array<'a>(&'a self) -> Option<Vec<&'a HBData>> {
     return match self {
       &Json::Array(ref a) => {
-        Some(FromIterator::from_iter(a.iter().map(|e| { e as &HBData })))
+        Some(a.iter().map(|e| { e as &HBData }).collect())
       },
       _ => None,
     }
@@ -95,7 +99,10 @@ impl HBData for Json {
         }
       },
       &Json::Object(_) => {
-        return Some(self.index(&key.as_slice()) as &HBData);  
+        return match self.find(key.as_slice()) {
+          Some(json) =>  Some(json as &HBData),
+          None => None,
+        }
       },
       _ => None,
     }
@@ -265,10 +272,18 @@ impl Helper {
 }
 
 
-#[deriving(Default)]
 pub struct EvalContext {
   partials: HashMap<String, Template>,
   helpers: HashMap<String, Helper>,
+}
+
+impl Default for EvalContext {
+  fn default() -> EvalContext { 
+    EvalContext { 
+      partials: Default::default(),
+      helpers: Default::default()
+    }
+  }
 }
 
 impl EvalContext {
@@ -294,32 +309,39 @@ impl EvalContext {
 }
 
 pub fn eval(template: &Template, data: &HBData, out: &mut Writer, eval_context: &EvalContext) -> HBEvalResult {
-  let mut stack:Vec<_> = FromIterator::from_iter(template.iter().map(|e| {
+  let mut stack:Vec<_> = template.iter().map(|e| {
     (e, data, Vec::new())
-  }));
+  }).collect();
 
-  while let Some((templ, ctxt, ctxt_stack)) = stack.remove(0) {
+  while stack.len() > 0 {
+    let (templ, ctxt, ctxt_stack) = stack.remove(0);
     let w_ok = match templ {
       &box HBEntry::Raw(ref s) => { 
         out.write_str(s.as_slice())
       },
-      &box HBEntry::Partial(HBExpression{ref base, ref params, ..}) => {
-        match eval_context.partial_with_name(base.get(0).unwrap().as_slice()) {
-          Some(t) => {
-            let c_ctxt = if let Some(&HBValHolder::Path(ref p)) = params.get(0) {
-              value_for_key_path(ctxt, p, &ctxt_stack).unwrap_or(ctxt)
-            } else {
-              ctxt
-            };
+      &box HBEntry::Partial(ref exp) => {
+        match exp.base.as_slice() {
+          [ref single] => {
+            match eval_context.partial_with_name(exp.base.get(0).unwrap().as_slice()) {
+              Some(t) => {
+                let c_ctxt = if let Some(&HBValHolder::Path(ref p)) = exp.params.get(0) {
+                  value_for_key_path(ctxt, p, &ctxt_stack).unwrap_or(ctxt)
+                } else {
+                  ctxt
+                };
 
-            for e in t.iter().rev() {
-              let mut c_stack = ctxt_stack.clone();
-              c_stack.push(ctxt);
-              stack.insert(0, (e, c_ctxt, c_stack));
+                for e in t.iter().rev() {
+                  let mut c_stack = ctxt_stack.clone();
+                  c_stack.push(ctxt);
+                  stack.insert(0, (e, c_ctxt, c_stack));
+                }
+                Ok(())
+              },
+              _ => panic!("partial '{}' not found", exp.path())
             }
-            Ok(())
-          },
-          _ => panic!("partial {} not found", base)
+          }
+          [_, ..] => panic!("invalid partial name '{}'", exp.path()),
+          [] => panic!("invalid empty string to retrieve partial by name"),
         }
       },
 
@@ -344,12 +366,12 @@ pub fn eval(template: &Template, data: &HBData, out: &mut Writer, eval_context: 
         match base.as_slice() {
           [ref single] if eval_context.has_helper_with_name(single.as_slice()) => {
             let helper = eval_context.helper_with_name(single.as_slice()).unwrap();
-            let blocks: Vec<_> = FromIterator::from_iter([block, else_block].iter().map(|b| {
+            let blocks: Vec<_> = [block, else_block].iter().map(|b| {
               match b {
                 &&Some(box ref t) => Some(t),
                 &&None => None,
               }
-            }));
+            }).collect();
             if let [opt_block, opt_else_block] = blocks.as_slice() {
               helper.call_for_block(opt_block , opt_else_block, ctxt, params.as_slice(), options.as_slice(), out, eval_context, &ctxt_stack)
             } else {

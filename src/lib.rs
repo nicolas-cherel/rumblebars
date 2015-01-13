@@ -1,8 +1,10 @@
 #![crate_name="rumblebars"]
+#![feature(plugin)]
+#![feature(box_syntax)]
 
-#![feature(phase)]
-#[phase(plugin,link)] extern crate rustlex;
-#[phase(plugin, link)] extern crate log;
+#[plugin] extern crate rustlex;
+#[plugin] extern crate log;
+
 
 extern crate serialize;
 extern crate regex;
