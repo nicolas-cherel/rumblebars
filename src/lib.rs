@@ -3,10 +3,10 @@
 #![feature(box_syntax)]
 
 #[plugin] extern crate rustlex;
-#[plugin] extern crate log;
 
 
 extern crate "rustc-serialize" as serialize;
+extern crate log;
 extern crate regex;
 
 pub use self::parse::parse;

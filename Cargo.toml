@@ -5,6 +5,8 @@ authors = ["Nicolas Cherel"]
 
 [dependencies]
 rustc-serialize = "0.2.7"
+log = "0.1.9"
+regex = "0.1.10"
 
 [dependencies.rustlex]
 # git = "https://github.com/LeoTestard/rustlex"
