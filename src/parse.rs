@@ -1,5 +1,4 @@
 use std::io::BufReader;
-use std::io::Writer;
 use std::slice;
 use regex::Regex;
 use std::default::Default;
@@ -8,7 +7,6 @@ use std::default::Default;
 use self::Token::{TokSimpleExp, TokNoEscapeExp, TokBlockExp, TokBlockElseCond, TokBlockEndExp, TokPartialExp, TokRaw};
 use self::HBToken::{TokPathEntry,TokNoWhiteSpaceBefore, TokNoWhiteSpaceAfter,TokStringParam,TokParamStart, TokParamSep, TokOption};
 
-#[deriving(Show)]
 enum Token {
   // base template tokens 
   TokSimpleExp(String),
@@ -20,7 +18,6 @@ enum Token {
   TokRaw(String),
 }
 
-#[deriving(Show)]
 enum HBToken {
   TokPathEntry(String),
   TokNoWhiteSpaceBefore,
@@ -199,20 +196,17 @@ rustlex! HBExpressionLexer {
 
 }
 
-#[deriving(Show)]
 pub enum HBValHolder {
   String(String),
   Path(Vec<String>),
 }
 
-#[deriving(Show)]
 pub struct RenderOptions {
   pub escape: bool,
   pub no_leading_whitespace: bool,
   pub no_trailing_whitespace: bool,
 }
 
-#[deriving(Show)]
 pub struct HBExpression {
   pub base: Vec<String>,
   pub params: Vec<HBValHolder>,
@@ -231,14 +225,12 @@ impl HBExpression {
   }
 }
 
-#[deriving(Show)]
 pub enum HBEntry {
   Raw(String),
   Eval(HBExpression),
   Partial(HBExpression),
 }
 
-#[deriving(Show, Default)]
 pub struct Template {
   content: Vec<Box<HBEntry>>
 }
@@ -257,8 +249,6 @@ impl Default for Template {
   }
 }
 
-
-#[deriving(Show)]
 pub enum ParseError {
   UnkownError, // unknown as ‘still not diagnosed case’, not ’your grandma's TV is set on fire case’
   UnmatchedBlock,
@@ -489,9 +479,8 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
 
 #[cfg(test)]
 mod tests {
-  use std::io::BufReader;
   use std::default::Default;
-  use super::{parse, parse_hb_expression, HBEntry, HBExpression, HBValHolder, HBExpressionLexer};
+  use super::{parse, parse_hb_expression, HBEntry, HBExpression, HBValHolder};
 
   // commented out due to the error
   //   error: the trait `core::fmt::String` is not implemented for the type `parse::HBToken`

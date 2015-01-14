@@ -216,7 +216,7 @@ fn leading_whitespace() {
       Pouet
 
       {{/p}}"##).ok().unwrap();
-  let mut eval_ctxt: EvalContext = Default::default();
+  let eval_ctxt: EvalContext = Default::default();
   let mut buf: Vec<u8> = Vec::new();
 
   eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
@@ -237,7 +237,7 @@ fn trailing_whitespace() {
       Pouet
 
       {{/p}}"##).ok().unwrap();
-  let mut eval_ctxt: EvalContext = Default::default();
+  let eval_ctxt: EvalContext = Default::default();
   let mut buf: Vec<u8> = Vec::new();
 
   eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
@@ -276,7 +276,7 @@ fn nested_whitespace() {
       {{#u~}} Uuuuu {{/u~}}
       ooOOOO
       {{/p}}"##).ok().unwrap();
-  let mut eval_ctxt: EvalContext = Default::default();
+  let eval_ctxt: EvalContext = Default::default();
   let mut buf: Vec<u8> = Vec::new();
 
   eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
@@ -299,7 +299,7 @@ fn autotrim() {
       {{/p}}
     "##).ok().unwrap();
   
-    let mut eval_ctxt: EvalContext = Default::default();
+    let eval_ctxt: EvalContext = Default::default();
     let mut buf: Vec<u8> = Vec::new();
   
     eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
@@ -327,7 +327,7 @@ fn autotrim() {
       {{/p}}
     "##).ok().unwrap();
   
-    let mut eval_ctxt: EvalContext = Default::default();
+    let eval_ctxt: EvalContext = Default::default();
     let mut buf: Vec<u8> = Vec::new();
   
     eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
@@ -354,7 +354,7 @@ fn autotrim() {
       {{/p}}
     "##).ok().unwrap();
   
-    let mut eval_ctxt: EvalContext = Default::default();
+    let eval_ctxt: EvalContext = Default::default();
     let mut buf: Vec<u8> = Vec::new();
   
     eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
