@@ -19,8 +19,12 @@ fn value_for_key_path<'a>(data: &'a HBData, key_path: &Vec<String>, context_stac
       "."  => {continue},
       ".." => {
         stack_index += 1;
-        assert!(stack_index <= context_stack.len());
-        ctxt = Some(*context_stack.get(context_stack.len() - stack_index).unwrap());
+        ctxt = if stack_index <= context_stack.len() {
+          Some(*context_stack.get(context_stack.len() - stack_index).unwrap())
+        } else {
+          ctxt
+        };
+
         continue;
       }
       _ => (),
