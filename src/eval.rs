@@ -322,7 +322,7 @@ pub fn eval(template: &Template, data: &HBData, out: &mut Writer, eval_context: 
       &box HBEntry::Partial(ref exp) => {
         match exp.base.as_slice() {
           [ref single] => {
-            match eval_context.partial_with_name(exp.base.get(0).unwrap().as_slice()) {
+            match eval_context.partial_with_name(single.as_slice()) {
               Some(t) => {
                 let c_ctxt = if let Some(&HBValHolder::Path(ref p)) = exp.params.get(0) {
                   value_for_key_path(ctxt, p, &ctxt_stack).unwrap_or(ctxt)
