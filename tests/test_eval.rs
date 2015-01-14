@@ -20,7 +20,7 @@ fn simple_render() {
 
   eval(&tmpl, &json, &mut buf, &Default::default()).unwrap();
 
-  assert_eq!(String::from_utf8(buf).unwrap(), "that poney has something sad in its eye".to_string());
+  assert_eq!(String::from_utf8(buf).unwrap(), "that poney has something sad in its eye");
 }
 
 #[test]
@@ -31,7 +31,7 @@ fn simple_render_with_raw() {
 
   eval(&tmpl, &json, &mut buf, &Default::default()).unwrap();
 
-  assert_eq!(String::from_utf8(buf).unwrap(), "prelude that poney has something sad in its eye post".to_string());
+  assert_eq!(String::from_utf8(buf).unwrap(), "prelude that poney has something sad in its eye post");
 }
 
 #[test]
@@ -42,7 +42,7 @@ fn simple_render_with_block() {
 
   eval(&tmpl, &json, &mut buf, &Default::default()).unwrap();
 
-  assert_eq!(String::from_utf8(buf).unwrap(), "prelude that poney has something sad in its eye post".to_string());
+  assert_eq!(String::from_utf8(buf).unwrap(), "prelude that poney has something sad in its eye post");
 }
 
 #[test]
@@ -53,7 +53,7 @@ fn iteration_with_block() {
 
   eval(&tmpl, &json, &mut buf, &Default::default()).unwrap();
 
-  assert_eq!(String::from_utf8(buf).unwrap(), "1234".to_string());
+  assert_eq!(String::from_utf8(buf).unwrap(), "1234");
 }
 
 #[test]
@@ -64,7 +64,7 @@ fn iteration_with_rich_block() {
 
   eval(&tmpl, &json, &mut buf, &Default::default()).unwrap();
 
-  assert_eq!(String::from_utf8(buf).unwrap(), "1(a)2(b)3(c)4(d)".to_string());
+  assert_eq!(String::from_utf8(buf).unwrap(), "1(a)2(b)3(c)4(d)");
 }
 
 #[test]
@@ -75,7 +75,7 @@ fn parent_key() {
 
   eval(&tmpl, &json, &mut buf, &Default::default()).unwrap();
 
-  assert_eq!(String::from_utf8(buf).unwrap(), "bbccc".to_string());
+  assert_eq!(String::from_utf8(buf).unwrap(), "bbccc");
 }
 
 #[test]
@@ -86,7 +86,7 @@ fn iteration_with_block_and_parent_key() {
 
   eval(&tmpl, &json, &mut buf, &Default::default()).unwrap();
 
-  assert_eq!(String::from_utf8(buf).unwrap(), "1-2-3-4-".to_string());
+  assert_eq!(String::from_utf8(buf).unwrap(), "1-2-3-4-");
 }
 
 #[test]
@@ -101,7 +101,7 @@ fn partial() {
 
   eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
-  assert_eq!(String::from_utf8(buf).unwrap(), "found this data".to_string()); 
+  assert_eq!(String::from_utf8(buf).unwrap(), "found this data"); 
 }
 
 #[test]
@@ -118,7 +118,7 @@ fn partial_block() {
 
   eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
-  assert_eq!(String::from_utf8(buf).unwrap(), "found this data and yep, was found i yep, was found j yep, was found k ".to_string()); 
+  assert_eq!(String::from_utf8(buf).unwrap(), "found this data and yep, was found i yep, was found j yep, was found k "); 
 }
 
  #[allow(unused_variables)]
@@ -137,7 +137,7 @@ fn helper() {
 
   eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
-  assert_eq!(String::from_utf8(buf).unwrap(), "from p eval".to_string()); 
+  assert_eq!(String::from_utf8(buf).unwrap(), "from p eval"); 
 
 }
 
@@ -160,7 +160,7 @@ fn helper_context() {
 
   eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
-  assert_eq!(String::from_utf8(buf).unwrap(), "pouet".to_string()); 
+  assert_eq!(String::from_utf8(buf).unwrap(), "pouet"); 
 
 }
 
@@ -183,7 +183,7 @@ fn helper_val() {
 
   eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
-  assert_eq!(String::from_utf8(buf).unwrap(), "value : toto".to_string()); 
+  assert_eq!(String::from_utf8(buf).unwrap(), "value : toto"); 
 }
 
 fn cd(_: &[&HBData], options: &HelperOptions, out: &mut Writer, _: &EvalContext) -> HBEvalResult {
@@ -205,7 +205,7 @@ fn helper_cond() {
 
   eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
-  assert_eq!(String::from_utf8(buf).unwrap(), "value : p true z false".to_string()); 
+  assert_eq!(String::from_utf8(buf).unwrap(), "value : p true z false"); 
 }
 
 #[test]
@@ -225,7 +225,7 @@ fn leading_whitespace() {
 
       "##;
 
-  assert_eq!(String::from_utf8(buf).unwrap(), expected.to_string()); 
+  assert_eq!(String::from_utf8(buf).unwrap(), expected); 
 }
 
 
@@ -246,7 +246,7 @@ fn trailing_whitespace() {
 
       Pouet"##;
 
-  assert_eq!(String::from_utf8(buf).unwrap(), expected.to_string()); 
+  assert_eq!(String::from_utf8(buf).unwrap(), expected); 
 }
 
 #[test]
@@ -257,14 +257,14 @@ fn both_whitespace() {
       Pouet pouet
 
       {{/p}}"##).ok().unwrap();
-  let mut eval_ctxt: EvalContext = Default::default();
+  let eval_ctxt: EvalContext = Default::default();
   let mut buf: Vec<u8> = Vec::new();
 
   eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
   let expected = r##"Pouet pouet"##;
 
-  assert_eq!(String::from_utf8(buf).unwrap(), expected.to_string()); 
+  assert_eq!(String::from_utf8(buf).unwrap(), expected); 
 }
 
 
@@ -284,7 +284,7 @@ fn nested_whitespace() {
   let expected = r##" Uuuuu
       ooOOOO"##;
 
-  assert_eq!(String::from_utf8(buf).unwrap(), expected.to_string()); 
+  assert_eq!(String::from_utf8(buf).unwrap(), expected); 
 }
 
 #[test]
@@ -309,7 +309,7 @@ fn autotrim() {
   
     "##;
   
-    assert_eq!(String::from_utf8(buf).unwrap(), expected.to_string()); 
+    assert_eq!(String::from_utf8(buf).unwrap(), expected); 
   }
 
   {
@@ -340,7 +340,7 @@ fn autotrim() {
   
     "##;
   
-    assert_eq!(String::from_utf8(buf).unwrap(), expected.to_string()); 
+    assert_eq!(String::from_utf8(buf).unwrap(), expected); 
   }
 
   {
@@ -367,7 +367,7 @@ fn autotrim() {
       
     "##;
   
-    assert_eq!(String::from_utf8(buf).unwrap(), expected.to_string()); 
+    assert_eq!(String::from_utf8(buf).unwrap(), expected); 
   }
 }
 

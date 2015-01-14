@@ -437,7 +437,7 @@ mod tests {
 
     value_for_key_path(&json, &vec!["a".to_string()], &vec![]).unwrap().write_value(&mut buf).unwrap();
 
-    assert_eq!(String::from_utf8(buf).unwrap(), "1".to_string());
+    assert_eq!(String::from_utf8(buf).unwrap(), "1");
   }
 
   #[test]
@@ -447,7 +447,7 @@ mod tests {
 
     value_for_key_path(&json, &vec!["a".to_string(), "b".to_string()], &vec![]).unwrap().write_value(&mut buf).unwrap();
 
-    assert_eq!(String::from_utf8(buf).unwrap(), "1".to_string());
+    assert_eq!(String::from_utf8(buf).unwrap(), "1");
   }
 
   #[test]
@@ -457,7 +457,7 @@ mod tests {
 
     value_for_key_path(&json, &vec!["a".to_string(), "0".to_string()], &vec![]).unwrap().write_value(&mut buf).unwrap();
 
-    assert_eq!(String::from_utf8(buf).unwrap(), "1".to_string());
+    assert_eq!(String::from_utf8(buf).unwrap(), "1");
   }
 
   #[test]
@@ -467,7 +467,7 @@ mod tests {
 
     value_for_key_path(&json, &vec![".".to_string()], &vec![]).unwrap().write_value(&mut buf).unwrap();
 
-    assert_eq!(String::from_utf8(buf).unwrap(), "hello".to_string());
+    assert_eq!(String::from_utf8(buf).unwrap(), "hello");
   }
 
   #[test]
@@ -477,7 +477,7 @@ mod tests {
 
     value_for_key_path(&json, &vec![".".to_string(), "t".to_string()], &vec![]).unwrap().write_value(&mut buf).unwrap();
 
-    assert_eq!(String::from_utf8(buf).unwrap(), "hello".to_string());
+    assert_eq!(String::from_utf8(buf).unwrap(), "hello");
   }
 
   #[test]
