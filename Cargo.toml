@@ -3,6 +3,9 @@ name = "rumblebars"
 version = "0.0.1"
 authors = ["Nicolas Cherel"]
 
+[dependencies]
+rustc-serialize = "0.2.7"
+
 [dependencies.rustlex]
 # git = "https://github.com/LeoTestard/rustlex"
 git = "https://github.com/kali/rustlex"

@@ -1,7 +1,7 @@
 extern crate rumblebars;
-extern crate serialize; 
+extern crate "rustc-serialize" as serialize;
 
-use serialize::json;
+use serialize::json::Json;
 use std::default::Default;
 
 use rumblebars::eval;
@@ -14,7 +14,7 @@ use rumblebars::parse;
 
 #[test]
 fn simple_render() {
-  let json = json::from_str(r##"{"p": "that poney has something sad in its eye"}"##).ok().unwrap();
+  let json = Json::from_str(r##"{"p": "that poney has something sad in its eye"}"##).ok().unwrap();
   let tmpl = parse(r##"{{p}}"##).ok().unwrap();
   let mut buf: Vec<u8> = Vec::new();
 
@@ -25,7 +25,7 @@ fn simple_render() {
 
 #[test]
 fn simple_render_with_raw() {
-  let json = json::from_str(r##"{"p": "that poney has something sad in its eye"}"##).ok().unwrap();
+  let json = Json::from_str(r##"{"p": "that poney has something sad in its eye"}"##).ok().unwrap();
   let tmpl = parse(r##"prelude {{p}} post"##).ok().unwrap();
   let mut buf: Vec<u8> = Vec::new();
 
@@ -36,7 +36,7 @@ fn simple_render_with_raw() {
 
 #[test]
 fn simple_render_with_block() {
-  let json = json::from_str(r##"{"p": { "k": "that poney has something sad in its eye"}}"##).ok().unwrap();
+  let json = Json::from_str(r##"{"p": { "k": "that poney has something sad in its eye"}}"##).ok().unwrap();
   let tmpl = parse(r##"prelude {{#p}}{{k}}{{/p}} post"##).ok().unwrap();
   let mut buf: Vec<u8> = Vec::new();
 
@@ -47,7 +47,7 @@ fn simple_render_with_block() {
 
 #[test]
 fn iteration_with_block() {
-  let json = json::from_str(r##"{"p": [ 1, 2, 3, 4]}"##).ok().unwrap();
+  let json = Json::from_str(r##"{"p": [ 1, 2, 3, 4]}"##).ok().unwrap();
   let tmpl = parse(r##"{{#p}}{{.}}{{/p}}"##).ok().unwrap();
   let mut buf: Vec<u8> = Vec::new();
 
@@ -58,7 +58,7 @@ fn iteration_with_block() {
 
 #[test]
 fn iteration_with_rich_block() {
-  let json = json::from_str(r##"{"p": [ {"i": 1, "j": "a"}, {"i": 2, "j": "b"}, {"i": 3, "j": "c"}, {"i": 4, "j": "d"}]}"##).ok().unwrap();
+  let json = Json::from_str(r##"{"p": [ {"i": 1, "j": "a"}, {"i": 2, "j": "b"}, {"i": 3, "j": "c"}, {"i": 4, "j": "d"}]}"##).ok().unwrap();
   let tmpl = parse(r##"{{#p}}{{i}}({{j}}){{/p}}"##).ok().unwrap();
   let mut buf: Vec<u8> = Vec::new();
 
@@ -69,7 +69,7 @@ fn iteration_with_rich_block() {
 
 #[test]
 fn parent_key() {
-  let json = json::from_str(r##"{"a": {"b": "bb"}, "c": "ccc"}"##).ok().unwrap();
+  let json = Json::from_str(r##"{"a": {"b": "bb"}, "c": "ccc"}"##).ok().unwrap();
   let tmpl = parse(r##"{{#a}}{{b}}{{../c}}{{/a}}"##).ok().unwrap();
   let mut buf: Vec<u8> = Vec::new();
 
@@ -80,7 +80,7 @@ fn parent_key() {
 
 #[test]
 fn iteration_with_block_and_parent_key() {
-  let json = json::from_str(r##"{"p": [ 1,  2,  3,  4], "b": "-"}"##).ok().unwrap();
+  let json = Json::from_str(r##"{"p": [ 1,  2,  3,  4], "b": "-"}"##).ok().unwrap();
   let tmpl = parse(r##"{{#p}}{{.}}{{../b}}{{/p}}"##).ok().unwrap();
   let mut buf: Vec<u8> = Vec::new();
 
@@ -91,7 +91,7 @@ fn iteration_with_block_and_parent_key() {
 
 #[test]
 fn partial() {
-  let json = json::from_str(r##"{"a": "data"}"##).ok().unwrap();
+  let json = Json::from_str(r##"{"a": "data"}"##).ok().unwrap();
   let tmpl = parse(r##"{{>test}}"##).ok().unwrap();
   let partial = parse(r##"found this {{a}}"##).ok().unwrap();
   let mut eval_ctxt: EvalContext = Default::default();
@@ -106,7 +106,7 @@ fn partial() {
 
 #[test]
 fn partial_block() {
-  let json = json::from_str(r##"{"a": "data", "b": ["i", "j", "k"]}"##).ok().unwrap();
+  let json = Json::from_str(r##"{"a": "data", "b": ["i", "j", "k"]}"##).ok().unwrap();
   let tmpl = parse(r##"{{>test}} and {{#b}}{{>check}}{{/b}}"##).ok().unwrap();
   let partial = parse(r##"found this {{a}}"##).ok().unwrap();
   let partial_check = parse(r##"yep, was found {{.}} "##).ok().unwrap();
@@ -128,7 +128,7 @@ fn p(params: &[&HBData], options: &HelperOptions, out: &mut Writer, hb_context: 
 
 #[test]
 fn helper() {
-  let json = json::from_str(r##""""##).ok().unwrap();
+  let json = Json::from_str(r##""""##).ok().unwrap();
   let tmpl = parse(r##"{{p}}"##).ok().unwrap();
   let mut eval_ctxt: EvalContext = Default::default();
   let mut buf: Vec<u8> = Vec::new();
@@ -151,7 +151,7 @@ fn c(params: &[&HBData], options: &HelperOptions, out: &mut Writer, hb_context: 
 
 #[test]
 fn helper_context() {
-  let json = json::from_str(r##""""##).ok().unwrap();
+  let json = Json::from_str(r##""""##).ok().unwrap();
   let tmpl = parse(r##"{{c "pouet"}}"##).ok().unwrap();
   let mut eval_ctxt: EvalContext = Default::default();
   let mut buf: Vec<u8> = Vec::new();
@@ -174,7 +174,7 @@ fn v(params: &[&HBData], options: &HelperOptions, out: &mut Writer, hb_context: 
 
 #[test]
 fn helper_val() {
-  let json = json::from_str(r##""""##).ok().unwrap();
+  let json = Json::from_str(r##""""##).ok().unwrap();
   let tmpl = parse(r##"value : {{v "toto"}}"##).ok().unwrap();
   let mut eval_ctxt: EvalContext = Default::default();
   let mut buf: Vec<u8> = Vec::new();
@@ -196,7 +196,7 @@ fn cd(_: &[&HBData], options: &HelperOptions, out: &mut Writer, _: &EvalContext)
 
 #[test]
 fn helper_cond() {
-  let json = json::from_str(r##"{"p": true, "z": false, "r": "rumble"}"##).ok().unwrap();
+  let json = Json::from_str(r##"{"p": true, "z": false, "r": "rumble"}"##).ok().unwrap();
   let tmpl = parse(r##"value : {{#if p}}p true{{else}}p false{{/if}} {{#if z}}z true{{else}}z false{{/if}}"##).ok().unwrap();
   let mut eval_ctxt: EvalContext = Default::default();
   let mut buf: Vec<u8> = Vec::new();
@@ -210,7 +210,7 @@ fn helper_cond() {
 
 #[test]
 fn leading_whitespace() {
-  let json = json::from_str(r##"{"p": {}}"##).ok().unwrap();
+  let json = Json::from_str(r##"{"p": {}}"##).ok().unwrap();
   let tmpl = parse(r##"{{~#p}}
 
       Pouet
@@ -231,7 +231,7 @@ fn leading_whitespace() {
 
 #[test]
 fn trailing_whitespace() {
-  let json = json::from_str(r##"{"p": {}}"##).ok().unwrap();
+  let json = Json::from_str(r##"{"p": {}}"##).ok().unwrap();
   let tmpl = parse(r##"{{#p~}}
 
       Pouet
@@ -251,7 +251,7 @@ fn trailing_whitespace() {
 
 #[test]
 fn both_whitespace() {
-  let json = json::from_str(r##"{"p": {}}"##).ok().unwrap();
+  let json = Json::from_str(r##"{"p": {}}"##).ok().unwrap();
   let tmpl = parse(r##"{{~#p~}}
 
       Pouet pouet
@@ -270,7 +270,7 @@ fn both_whitespace() {
 
 #[test]
 fn nested_whitespace() {
-  let json = json::from_str(r##"{"p": {"u": {}}}"##).ok().unwrap();
+  let json = Json::from_str(r##"{"p": {"u": {}}}"##).ok().unwrap();
   let tmpl = parse(r##"{{~#p~}}
 
       {{#u~}} Uuuuu {{/u~}}
@@ -290,7 +290,7 @@ fn nested_whitespace() {
 #[test]
 fn autotrim() {
   {
-    let json = json::from_str(r##"{"p": {}}"##).ok().unwrap();
+    let json = Json::from_str(r##"{"p": {}}"##).ok().unwrap();
     let tmpl = parse(r##"
       {{#p}}    
         o
@@ -313,7 +313,7 @@ fn autotrim() {
   }
 
   {
-    let json = json::from_str(r##"{"p": {"u": {}}}"##).ok().unwrap();
+    let json = Json::from_str(r##"{"p": {"u": {}}}"##).ok().unwrap();
     let tmpl = parse(r##"
       {{#p}}    
         o
@@ -344,7 +344,7 @@ fn autotrim() {
   }
 
   {
-    let json = json::from_str(r##"{"p": {}}"##).ok().unwrap();
+    let json = Json::from_str(r##"{"p": {}}"##).ok().unwrap();
     let tmpl = parse(r##"
       {{#p}}i    
         o

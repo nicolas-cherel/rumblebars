@@ -423,7 +423,7 @@ pub fn eval(template: &Template, data: &HBData, out: &mut Writer, eval_context: 
 #[cfg(test)]
 mod tests {
 
-  use serialize::json;
+  use serialize::json::Json;
   use std::default::Default;
 
   use super::value_for_key_path;
@@ -432,7 +432,7 @@ mod tests {
 
   #[test]
   fn fetch_key_value() {
-    let json = json::from_str(r##"{"a": 1}"##).unwrap();
+    let json = Json::from_str(r##"{"a": 1}"##).unwrap();
     let mut buf: Vec<u8> = Vec::new();
 
     value_for_key_path(&json, &vec!["a".to_string()], &vec![]).unwrap().write_value(&mut buf).unwrap();
@@ -442,7 +442,7 @@ mod tests {
 
   #[test]
   fn fetch_key_value_level1() {
-    let json = json::from_str(r##"{"a": {"b": 1}}"##).unwrap();
+    let json = Json::from_str(r##"{"a": {"b": 1}}"##).unwrap();
     let mut buf: Vec<u8> = Vec::new();
 
     value_for_key_path(&json, &vec!["a".to_string(), "b".to_string()], &vec![]).unwrap().write_value(&mut buf).unwrap();
@@ -452,7 +452,7 @@ mod tests {
 
   #[test]
   fn fetch_key_value_array_level1() {
-    let json = json::from_str(r##"{"a": [1, 2, 3]}"##).unwrap();
+    let json = Json::from_str(r##"{"a": [1, 2, 3]}"##).unwrap();
     let mut buf: Vec<u8> = Vec::new();
 
     value_for_key_path(&json, &vec!["a".to_string(), "0".to_string()], &vec![]).unwrap().write_value(&mut buf).unwrap();
@@ -462,7 +462,7 @@ mod tests {
 
   #[test]
   fn resolve_this_in_keypath() {
-    let json = json::from_str(r##""hello""##).unwrap();
+    let json = Json::from_str(r##""hello""##).unwrap();
     let mut buf: Vec<u8> = Vec::new();
 
     value_for_key_path(&json, &vec![".".to_string()], &vec![]).unwrap().write_value(&mut buf).unwrap();
@@ -472,7 +472,7 @@ mod tests {
 
   #[test]
   fn resolve_this_subkey_in_keypath() {
-    let json = json::from_str(r##"{"t": "hello"}"##).unwrap();
+    let json = Json::from_str(r##"{"t": "hello"}"##).unwrap();
     let mut buf: Vec<u8> = Vec::new();
 
     value_for_key_path(&json, &vec![".".to_string(), "t".to_string()], &vec![]).unwrap().write_value(&mut buf).unwrap();
@@ -482,7 +482,7 @@ mod tests {
 
   #[test]
   fn deep_path_none() {
-    let json = json::from_str(r##"{"a": 1}"##).unwrap();
+    let json = Json::from_str(r##"{"a": 1}"##).unwrap();
 
     match value_for_key_path(&json, &vec!["a".to_string(), "b".to_string()], &vec![]) {
       Some(_) => assert!(false),
@@ -492,7 +492,7 @@ mod tests {
 
   #[test]
   fn compile_call() {
-    let json = json::from_str(r##"{"a": 1}"##).unwrap();
+    let json = Json::from_str(r##"{"a": 1}"##).unwrap();
     let templ = Default::default();
     let mut buf: Vec<u8> = Vec::new();
 

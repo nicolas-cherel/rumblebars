@@ -6,7 +6,7 @@
 #[plugin] extern crate log;
 
 
-extern crate serialize;
+extern crate "rustc-serialize" as serialize;
 extern crate regex;
 
 pub use self::parse::parse;
