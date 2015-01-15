@@ -10,7 +10,13 @@ use parse::HBEntry;
 use parse::HBExpression;
 use parse::HBValHolder;
 
-fn value_for_key_path<'a>(data: &'a HBData, key_path: &Vec<String>, context_stack: &Vec<&'a HBData>) ->  Option<&'a (HBData + 'a)> {
+fn value_for_key_path_in_context<'a>(
+  data: &'a HBData,
+  key_path: &Vec<String>,
+  context_stack: &Vec<&'a HBData>,
+  global_data: &HashMap<&str, &'a HBData>,
+) ->  Option<&'a (HBData + 'a)> 
+{
   let mut ctxt = Some(data);
   let mut stack_index = 0;
   
@@ -27,12 +33,15 @@ fn value_for_key_path<'a>(data: &'a HBData, key_path: &Vec<String>, context_stac
 
         continue;
       }
+      _ if key.starts_with("@") => {
+
+      }
       _ => (),
     }
 
     ctxt = match ctxt {
       Some(c) => c.get_key(key.as_slice()),
-      _ => None, // keys only match against arrays and objects
+      _ => return None, // not found
     }
   }
 
@@ -57,6 +66,7 @@ pub trait HBData {
   fn get_key<'a>(&'a self, key: &str) -> Option<&'a HBData>;
   fn as_bool(&self) -> bool;
 }
+
 
 impl HBData for Json {
 
@@ -195,12 +205,18 @@ impl Helper {
     Helper { helper_func: f }
   }
 
-  fn build_param_vec<'a, 'b>(context: &'a HBData, params: &'a [HBValHolder], ctxt_stack: &'b Vec<&'a HBData>) -> Vec<&'a (HBData + 'a)> {
+  fn build_param_vec<'a, 'b>(
+    context: &'a HBData,
+    params: &'a [HBValHolder],
+    ctxt_stack: &'b Vec<&'a HBData>,
+    global_data: &HashMap<&str, &'a HBData>
+  ) -> Vec<&'a (HBData + 'a)> 
+  {
     let mut evaluated_params: Vec<&HBData> = vec![];
     for v in params.iter() {
       match v {
         &HBValHolder::String(ref s) => evaluated_params.push(s as &HBData),
-        &HBValHolder::Path(ref p) => if let Some(d) = value_for_key_path(context, p, ctxt_stack) {
+        &HBValHolder::Path(ref p) => if let Some(d) = value_for_key_path_in_context(context, p, ctxt_stack, global_data) {
           evaluated_params.push(d)
         },
       }
@@ -209,12 +225,18 @@ impl Helper {
     evaluated_params   
   }
 
-  fn build_options_map<'a, 'b>(context:&'a HBData, options: &'a [(String, HBValHolder)], ctxt_stack: &'b Vec<&'a HBData>) -> HelperOptionsByName<'a> {
+  fn build_options_map<'a, 'b>(
+    context:&'a HBData,
+    options: &'a [(String, HBValHolder)],
+    ctxt_stack: &'b Vec<&'a HBData>,
+    global_data: &HashMap<&str, &'a HBData>
+  ) -> HelperOptionsByName<'a> 
+  {
     let mut options_iter = options.iter().map(|&(ref name, ref val)| {
       match val {
         &HBValHolder::String(ref s) => Some((name, s as &HBData)),
         &HBValHolder::Path(ref p) => {
-          if let Some(v) = value_for_key_path(context, p, ctxt_stack) {
+          if let Some(v) = value_for_key_path_in_context(context, p, ctxt_stack, global_data) {
             Some((name, v))
           } else {
             None
@@ -234,12 +256,23 @@ impl Helper {
     h
   }
 
-  fn call_for_block<'a, 'b, 'c>(&self, block: Option<&'a Template>, inverse: Option<&'a Template>, context: &'a HBData, params: &'a [HBValHolder], options: &'a [(String, HBValHolder)], out: &'b mut Writer, hb_context: &'a EvalContext, ctxt_stack: &'c Vec<&'a HBData>) -> HBEvalResult {
+  fn call_for_block<'a, 'b, 'c>(
+    &self,
+    block: Option<&'a Template>,
+    inverse: Option<&'a Template>,
+    context: &'a HBData,
+    params: &'a [HBValHolder],
+    options: &'a [(String, HBValHolder)],
+    out: &'b mut Writer,
+    hb_context: &'a EvalContext,
+    ctxt_stack: &'c Vec<&'a HBData>,
+    global_data: &HashMap<&str, &'a HBData>
+  ) -> HBEvalResult {
     
     let condition = match params.as_slice() {
       [ref val, ..] => match val {
         &HBValHolder::String(ref s) => s.as_bool(),
-        &HBValHolder::Path(ref p) => if let Some(v) = value_for_key_path(context, p, ctxt_stack) {
+        &HBValHolder::Path(ref p) => if let Some(v) = value_for_key_path_in_context(context, p, ctxt_stack, global_data) {
           v.as_bool()
         } else {
           false
@@ -254,23 +287,32 @@ impl Helper {
       context: context, 
       hb_context: hb_context,
       condition: condition,
-      options: Helper::build_options_map(context, options, ctxt_stack),
+      options: Helper::build_options_map(context, options, ctxt_stack, global_data),
     };
 
-    (self.helper_func)(Helper::build_param_vec(context, params, ctxt_stack).as_slice(), &helper_options, out, hb_context)
+    (self.helper_func)(Helper::build_param_vec(context, params, ctxt_stack, global_data).as_slice(), &helper_options, out, hb_context)
   }
 
-  fn call_fn<'a, 'b, 'c>(&self, context: &'a HBData, params: &'a [HBValHolder], options: &'a [(String, HBValHolder)], out: &'b mut Writer, hb_context: &'a EvalContext,  ctxt_stack: &'c Vec<&'a HBData>) -> HBEvalResult {
+  fn call_fn<'a, 'b, 'c>(
+    &self,
+    context: &'a HBData,
+    params: &'a [HBValHolder],
+    options: &'a [(String, HBValHolder)],
+    out: &'b mut Writer,
+    hb_context: &'a EvalContext,
+    ctxt_stack: &'c Vec<&'a HBData>,
+    global_data: &HashMap<&str, &'a HBData>
+  ) -> HBEvalResult {
     let helper_options = HelperOptions { 
       block: None, 
       inverse: None, 
       context: context, 
       hb_context: hb_context,
       condition: true,
-      options: Helper::build_options_map(context, options, ctxt_stack),
+      options: Helper::build_options_map(context, options, ctxt_stack, global_data),
     };
 
-    (self.helper_func)(Helper::build_param_vec(context, params, ctxt_stack).as_slice(), &helper_options, out, hb_context)
+    (self.helper_func)(Helper::build_param_vec(context, params, ctxt_stack, global_data).as_slice(), &helper_options, out, hb_context)
   }
   
 }
@@ -278,7 +320,7 @@ impl Helper {
 
 pub struct EvalContext {
   partials: HashMap<String, Template>,
-  helpers: HashMap<String, Helper>,
+  helpers: HashMap<String, Helper>
 }
 
 impl Default for EvalContext {
@@ -313,6 +355,7 @@ impl EvalContext {
 }
 
 pub fn eval(template: &Template, data: &HBData, out: &mut Writer, eval_context: &EvalContext) -> HBEvalResult {
+  let mut global_data = HashMap::new();
   let mut stack:Vec<_> = template.iter().map(|e| {
     (e, data, Vec::new())
   }).collect();
@@ -329,7 +372,7 @@ pub fn eval(template: &Template, data: &HBData, out: &mut Writer, eval_context: 
             match eval_context.partial_with_name(single.as_slice()) {
               Some(t) => {
                 let c_ctxt = if let Some(&HBValHolder::Path(ref p)) = exp.params.get(0) {
-                  value_for_key_path(ctxt, p, &ctxt_stack).unwrap_or(ctxt)
+                  value_for_key_path_in_context(ctxt, p, &ctxt_stack, &global_data).unwrap_or(ctxt)
                 } else {
                   ctxt
                 };
@@ -354,9 +397,9 @@ pub fn eval(template: &Template, data: &HBData, out: &mut Writer, eval_context: 
           [ref single] if eval_context.has_helper_with_name(single.as_slice()) => {
             let helper = eval_context.helper_with_name(single.as_slice()).unwrap();
             // let helper_params = 
-            helper.call_fn(ctxt, params.as_slice(), options.as_slice(), out, eval_context, &ctxt_stack)
+            helper.call_fn(ctxt, params.as_slice(), options.as_slice(), out, eval_context, &ctxt_stack, &global_data)
           },
-          _ => match value_for_key_path(ctxt, base, &ctxt_stack) {
+          _ => match value_for_key_path_in_context(ctxt, base, &ctxt_stack, &global_data) {
             Some(v) => match v.typed_node() {
               HBNodeType::Leaf(_) => v.write_value(out),
               _ => Ok(()),
@@ -377,13 +420,23 @@ pub fn eval(template: &Template, data: &HBData, out: &mut Writer, eval_context: 
               }
             }).collect();
             if let [opt_block, opt_else_block] = blocks.as_slice() {
-              helper.call_for_block(opt_block , opt_else_block, ctxt, params.as_slice(), options.as_slice(), out, eval_context, &ctxt_stack)
+              helper.call_for_block(
+                opt_block,
+                opt_else_block,
+                ctxt,
+                params.as_slice(),
+                options.as_slice(),
+                out,
+                eval_context,
+                &ctxt_stack,
+                &global_data
+              )
             } else {
               Ok(())
             }
           },
           _ => {
-            let c_ctxt = value_for_key_path(ctxt, base, &ctxt_stack);
+            let c_ctxt = value_for_key_path_in_context(ctxt, base, &ctxt_stack, &global_data);
 
             match (c_ctxt, block) {
               (Some(c), &Some(ref block_found)) => {
@@ -429,8 +482,9 @@ mod tests {
 
   use serialize::json::Json;
   use std::default::Default;
+  use std::collections::HashMap;
 
-  use super::value_for_key_path;
+  use super::value_for_key_path_in_context;
   use super::HBData;
   use super::eval;
 
@@ -438,8 +492,9 @@ mod tests {
   fn fetch_key_value() {
     let json = Json::from_str(r##"{"a": 1}"##).unwrap();
     let mut buf: Vec<u8> = Vec::new();
+    let h = HashMap::new();
 
-    value_for_key_path(&json, &vec!["a".to_string()], &vec![]).unwrap().write_value(&mut buf).unwrap();
+    value_for_key_path_in_context(&json, &vec!["a".to_string()], &vec![], &h).unwrap().write_value(&mut buf).unwrap();
 
     assert_eq!(String::from_utf8(buf).unwrap(), "1");
   }
@@ -448,8 +503,9 @@ mod tests {
   fn fetch_key_value_level1() {
     let json = Json::from_str(r##"{"a": {"b": 1}}"##).unwrap();
     let mut buf: Vec<u8> = Vec::new();
+    let h = HashMap::new();
 
-    value_for_key_path(&json, &vec!["a".to_string(), "b".to_string()], &vec![]).unwrap().write_value(&mut buf).unwrap();
+    value_for_key_path_in_context(&json, &vec!["a".to_string(), "b".to_string()], &vec![], &h).unwrap().write_value(&mut buf).unwrap();
 
     assert_eq!(String::from_utf8(buf).unwrap(), "1");
   }
@@ -458,8 +514,9 @@ mod tests {
   fn fetch_key_value_array_level1() {
     let json = Json::from_str(r##"{"a": [1, 2, 3]}"##).unwrap();
     let mut buf: Vec<u8> = Vec::new();
+    let h = HashMap::new();
 
-    value_for_key_path(&json, &vec!["a".to_string(), "0".to_string()], &vec![]).unwrap().write_value(&mut buf).unwrap();
+    value_for_key_path_in_context(&json, &vec!["a".to_string(), "0".to_string()], &vec![], &h).unwrap().write_value(&mut buf).unwrap();
 
     assert_eq!(String::from_utf8(buf).unwrap(), "1");
   }
@@ -468,8 +525,9 @@ mod tests {
   fn resolve_this_in_keypath() {
     let json = Json::from_str(r##""hello""##).unwrap();
     let mut buf: Vec<u8> = Vec::new();
+    let h = HashMap::new();
 
-    value_for_key_path(&json, &vec![".".to_string()], &vec![]).unwrap().write_value(&mut buf).unwrap();
+    value_for_key_path_in_context(&json, &vec![".".to_string()], &vec![], &h).unwrap().write_value(&mut buf).unwrap();
 
     assert_eq!(String::from_utf8(buf).unwrap(), "hello");
   }
@@ -478,8 +536,9 @@ mod tests {
   fn resolve_this_subkey_in_keypath() {
     let json = Json::from_str(r##"{"t": "hello"}"##).unwrap();
     let mut buf: Vec<u8> = Vec::new();
+    let h = HashMap::new();
 
-    value_for_key_path(&json, &vec![".".to_string(), "t".to_string()], &vec![]).unwrap().write_value(&mut buf).unwrap();
+    value_for_key_path_in_context(&json, &vec![".".to_string(), "t".to_string()], &vec![], &h).unwrap().write_value(&mut buf).unwrap();
 
     assert_eq!(String::from_utf8(buf).unwrap(), "hello");
   }
@@ -487,8 +546,9 @@ mod tests {
   #[test]
   fn deep_path_none() {
     let json = Json::from_str(r##"{"a": 1}"##).unwrap();
+    let h = HashMap::new();
 
-    match value_for_key_path(&json, &vec!["a".to_string(), "b".to_string()], &vec![]) {
+    match value_for_key_path_in_context(&json, &vec!["a".to_string(), "b".to_string()], &vec![], &h) {
       Some(_) => assert!(false),
       None    => assert!(true),
     }
