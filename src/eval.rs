@@ -15,11 +15,11 @@ fn value_for_key_path_in_context<'a>(
   key_path: &Vec<String>,
   context_stack: &Vec<&'a HBData>,
   global_data: &HashMap<&str, &'a HBData>,
-) ->  Option<&'a (HBData + 'a)> 
+) ->  Option<&'a (HBData + 'a)>
 {
   let mut ctxt = Some(data);
   let mut stack_index = 0;
-  
+
   for key in key_path.iter() {
     match key.as_slice() {
       "."  => {continue},
@@ -97,7 +97,7 @@ impl HBData for Json {
       },
       _ => None,
     }
-    
+
   }
 
   fn get_key<'a>(&'a self, key: &str) -> Option<&'a HBData> {
@@ -210,7 +210,7 @@ impl Helper {
     params: &'a [HBValHolder],
     ctxt_stack: &'b Vec<&'a HBData>,
     global_data: &HashMap<&str, &'a HBData>
-  ) -> Vec<&'a (HBData + 'a)> 
+  ) -> Vec<&'a (HBData + 'a)>
   {
     let mut evaluated_params: Vec<&HBData> = vec![];
     for v in params.iter() {
@@ -220,9 +220,9 @@ impl Helper {
           evaluated_params.push(d)
         },
       }
-    }; 
+    };
 
-    evaluated_params   
+    evaluated_params
   }
 
   fn build_options_map<'a, 'b>(
@@ -230,7 +230,7 @@ impl Helper {
     options: &'a [(String, HBValHolder)],
     ctxt_stack: &'b Vec<&'a HBData>,
     global_data: &HashMap<&str, &'a HBData>
-  ) -> HelperOptionsByName<'a> 
+  ) -> HelperOptionsByName<'a>
   {
     let mut options_iter = options.iter().map(|&(ref name, ref val)| {
       match val {
@@ -268,7 +268,7 @@ impl Helper {
     ctxt_stack: &'c Vec<&'a HBData>,
     global_data: &HashMap<&str, &'a HBData>
   ) -> HBEvalResult {
-    
+
     let condition = match params.as_slice() {
       [ref val, ..] => match val {
         &HBValHolder::String(ref s) => s.as_bool(),
@@ -281,10 +281,10 @@ impl Helper {
       _ => false
     };
 
-    let helper_options = HelperOptions { 
-      block: block, 
-      inverse: inverse, 
-      context: context, 
+    let helper_options = HelperOptions {
+      block: block,
+      inverse: inverse,
+      context: context,
       hb_context: hb_context,
       condition: condition,
       options: Helper::build_options_map(context, options, ctxt_stack, global_data),
@@ -303,10 +303,10 @@ impl Helper {
     ctxt_stack: &'c Vec<&'a HBData>,
     global_data: &HashMap<&str, &'a HBData>
   ) -> HBEvalResult {
-    let helper_options = HelperOptions { 
-      block: None, 
-      inverse: None, 
-      context: context, 
+    let helper_options = HelperOptions {
+      block: None,
+      inverse: None,
+      context: context,
       hb_context: hb_context,
       condition: true,
       options: Helper::build_options_map(context, options, ctxt_stack, global_data),
@@ -314,7 +314,7 @@ impl Helper {
 
     (self.helper_func)(Helper::build_param_vec(context, params, ctxt_stack, global_data).as_slice(), &helper_options, out, hb_context)
   }
-  
+
 }
 
 
@@ -324,8 +324,8 @@ pub struct EvalContext {
 }
 
 impl Default for EvalContext {
-  fn default() -> EvalContext { 
-    EvalContext { 
+  fn default() -> EvalContext {
+    EvalContext {
       partials: Default::default(),
       helpers: Default::default()
     }
@@ -356,125 +356,123 @@ impl EvalContext {
 
 pub fn eval(template: &Template, data: &HBData, out: &mut Writer, eval_context: &EvalContext) -> HBEvalResult {
   let mut global_data = HashMap::new();
-  let mut stack:Vec<_> = template.iter().map(|e| {
+  let mut stack:Vec<_> = template.iter().rev().map(|e| {
     (e, data, Vec::new())
   }).collect();
 
   while stack.len() > 0 {
-    let (templ, ctxt, ctxt_stack) = stack.remove(0);
-    let w_ok = match templ {
-      &box HBEntry::Raw(ref s) => { 
-        out.write_str(s.as_slice())
-      },
-      &box HBEntry::Partial(ref exp) => {
-        match exp.base.as_slice() {
-          [ref single] => {
-            match eval_context.partial_with_name(single.as_slice()) {
-              Some(t) => {
-                let c_ctxt = if let Some(&HBValHolder::Path(ref p)) = exp.params.get(0) {
-                  value_for_key_path_in_context(ctxt, p, &ctxt_stack, &global_data).unwrap_or(ctxt)
-                } else {
-                  ctxt
-                };
+    if let Some((templ, ctxt, ctxt_stack)) = stack.pop() {
+      let w_ok = match templ {
+        &box HBEntry::Raw(ref s) => {
+          out.write_str(s.as_slice())
+        },
+        &box HBEntry::Partial(ref exp) => {
+          match exp.base.as_slice() {
+            [ref single] => {
+              match eval_context.partial_with_name(single.as_slice()) {
+                Some(t) => {
+                  let c_ctxt = if let Some(&HBValHolder::Path(ref p)) = exp.params.get(0) {
+                    value_for_key_path_in_context(ctxt, p, &ctxt_stack, &global_data).unwrap_or(ctxt)
+                  } else {
+                    ctxt
+                  };
 
-                for e in t.iter().rev() {
-                  let mut c_stack = ctxt_stack.clone();
-                  c_stack.push(ctxt);
-                  stack.insert(0, (e, c_ctxt, c_stack));
-                }
-                Ok(())
-              },
-              _ => panic!("partial '{}' not found", exp.path())
-            }
-          }
-          [_, ..] => panic!("invalid partial name '{}'", exp.path()),
-          [] => panic!("invalid empty string to retrieve partial by name"),
-        }
-      },
-
-      &box HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref render_options, block: None, else_block: None}) => {
-        match base.as_slice() {
-          [ref single] if eval_context.has_helper_with_name(single.as_slice()) => {
-            let helper = eval_context.helper_with_name(single.as_slice()).unwrap();
-            // let helper_params = 
-            helper.call_fn(ctxt, params.as_slice(), options.as_slice(), out, eval_context, &ctxt_stack, &global_data)
-          },
-          _ => match value_for_key_path_in_context(ctxt, base, &ctxt_stack, &global_data) {
-            Some(v) => match v.typed_node() {
-              HBNodeType::Leaf(_) => v.write_value(out),
-              _ => Ok(()),
-            },
-            None => Ok(()),
-          }
-        }
-      },
-
-      &box HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref render_options, ref block, ref else_block}) => {
-        match base.as_slice() {
-          [ref single] if eval_context.has_helper_with_name(single.as_slice()) => {
-            let helper = eval_context.helper_with_name(single.as_slice()).unwrap();
-            let blocks: Vec<_> = [block, else_block].iter().map(|b| {
-              match b {
-                &&Some(box ref t) => Some(t),
-                &&None => None,
+                  for e in t.iter().rev() {
+                    let mut c_stack = ctxt_stack.clone();
+                    c_stack.push(ctxt);
+                    stack.push((e, c_ctxt, c_stack));
+                  }
+                  Ok(())
+                },
+                _ => panic!("partial '{}' not found", exp.path())
               }
-            }).collect();
-            if let [opt_block, opt_else_block] = blocks.as_slice() {
-              helper.call_for_block(
-                opt_block,
-                opt_else_block,
-                ctxt,
-                params.as_slice(),
-                options.as_slice(),
-                out,
-                eval_context,
-                &ctxt_stack,
-                &global_data
-              )
-            } else {
-              Ok(())
             }
-          },
-          _ => {
-            let c_ctxt = value_for_key_path_in_context(ctxt, base, &ctxt_stack, &global_data);
+            [_, ..] => panic!("invalid partial name '{}'", exp.path()),
+            [] => panic!("invalid empty string to retrieve partial by name"),
+          }
+        },
 
-            match (c_ctxt, block) {
-              (Some(c), &Some(ref block_found)) => {
-                match c.typed_node() {
-                  HBNodeType::Branch(_) => {
-                    for e in block_found.iter().rev() {
-                      let mut c_stack = ctxt_stack.clone();
-                      c_stack.push(ctxt);
-                      stack.insert(0, (e, c, c_stack));
-                    }                
-                  },
-                  HBNodeType::Array(a) => {
-                    if let Some(collection) = a.as_array() {
-                      for array_i in collection.iter().rev() {
-                        for e in block_found.iter().rev() {
-                          let mut c_stack = ctxt_stack.clone();
-                          c_stack.push(ctxt);
-                          stack.insert(0, (e, *array_i, c_stack));
-                        }   
-                      }
-                    }
-                  },
-                  _ => (),
-                }
+        &box HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref render_options, block: None, else_block: None}) => {
+          match base.as_slice() {
+            [ref single] if eval_context.has_helper_with_name(single.as_slice()) => {
+              let helper = eval_context.helper_with_name(single.as_slice()).unwrap();
+              // let helper_params =
+              helper.call_fn(ctxt, params.as_slice(), options.as_slice(), out, eval_context, &ctxt_stack, &global_data)
+            },
+            _ => match value_for_key_path_in_context(ctxt, base, &ctxt_stack, &global_data) {
+              Some(v) => match v.typed_node() {
+                HBNodeType::Leaf(_) => v.write_value(out),
+                _ => Ok(()),
               },
-              _ => ()
+              None => Ok(()),
             }
-            Ok(())
-          },
-        }
-      },
-    };
+          }
+        },
 
-    if let Err(no_ok) = w_ok {
-      return Err(no_ok);
+        &box HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref render_options, ref block, ref else_block}) => {
+          match base.as_slice() {
+            [ref single] if eval_context.has_helper_with_name(single.as_slice()) => {
+              let helper = eval_context.helper_with_name(single.as_slice()).unwrap();
+              let blocks: Vec<_> = [block, else_block].iter().map(|b| {
+                match b {
+                  &&Some(box ref t) => Some(t),
+                  &&None => None,
+                }
+              }).collect();
+              if let [opt_block, opt_else_block] = blocks.as_slice() {
+                helper.call_for_block(
+                  opt_block,
+                  opt_else_block,
+                  ctxt,
+                  params.as_slice(),
+                  options.as_slice(),
+                  out,
+                  eval_context,
+                  &ctxt_stack,
+                  &global_data
+                )
+              } else {
+                Ok(())
+              }
+            },
+            _ => {
+              let c_ctxt = value_for_key_path_in_context(ctxt, base, &ctxt_stack, &global_data);
+
+              match (c_ctxt, block) {
+                (Some(c), &Some(ref block_found)) => {
+                  match c.typed_node() {
+                    HBNodeType::Branch(_) => {
+                      for e in block_found.iter().rev() {
+                        let mut c_stack = ctxt_stack.clone();
+                        c_stack.push(ctxt);
+                        stack.push((e, c, c_stack));
+                      }
+                    },
+                    HBNodeType::Array(a) => {
+                      if let Some(collection) = a.as_array() {
+                        for array_i in collection.iter().rev() {
+                          for e in block_found.iter().rev() {
+                            let mut c_stack = ctxt_stack.clone();
+                            c_stack.push(ctxt);
+                            stack.push((e, *array_i, c_stack));
+                          }
+                        }
+                      }
+                    },
+                    _ => (),
+                  }
+                },
+                _ => ()
+              }
+              Ok(())
+            },
+          }
+        },
+      };
     }
   }
-  return Ok(());
+
+  Ok(())
 }
 
 #[cfg(test)]
