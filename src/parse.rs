@@ -8,7 +8,7 @@ use self::Token::{TokSimpleExp, TokNoEscapeExp, TokBlockExp, TokBlockElseCond, T
 use self::HBToken::{TokPathEntry,TokNoWhiteSpaceBefore, TokNoWhiteSpaceAfter,TokStringParam,TokParamStart, TokParamSep, TokOption};
 
 enum Token {
-  // base template tokens 
+  // base template tokens
   TokSimpleExp(String),
   TokNoEscapeExp(String),
   TokPartialExp(String, bool),
@@ -53,7 +53,7 @@ rustlex! HandleBarsLexer {
 
     // then rules
     PASS_THROUGH      => |lexer:&mut HandleBarsLexer<R>| Some( TokRaw( lexer.yystr() ) )
-    
+
     SIMPLE_EXP        => |lexer:&mut HandleBarsLexer<R>| Some( TokSimpleExp(     lexer.yystr() ) )
     NO_ESC_EXP        => |lexer:&mut HandleBarsLexer<R>| Some( TokNoEscapeExp(   lexer.yystr() ) )
     PARTIAL_EXP       => |lexer:&mut HandleBarsLexer<R>| Some( TokPartialExp(    lexer.yystr(), false ) )
@@ -62,16 +62,16 @@ rustlex! HandleBarsLexer {
     ELSE_EXP          => |lexer:&mut HandleBarsLexer<R>| Some( TokBlockElseCond( lexer.yystr(), false ) )
 
     PARTIAL_TRIM_EXP  => |lexer:&mut HandleBarsLexer<R>| {
-      Some( TokPartialExp( lexer.yystr()/*.trim().to_string()*/, true ) )    
+      Some( TokPartialExp( lexer.yystr().trim().to_string(), true ) )
     }
     END_TRIM_EXP      => |lexer:&mut HandleBarsLexer<R>| {
-      Some( TokBlockEndExp(lexer.yystr()/*.trim().to_string()*/, true ) )
+      Some( TokBlockEndExp(lexer.yystr().trim().to_string(), true ) )
     }
     BLOCK_TRIM_EXP    => |lexer:&mut HandleBarsLexer<R>| {
-      Some( TokBlockExp(   lexer.yystr()/*.trim().to_string()*/, true ) )
+      Some( TokBlockExp(   lexer.yystr().trim().to_string(), true ) )
     }
     ELSE_TRIM_EXP     => |lexer:&mut HandleBarsLexer<R>| {
-      Some( TokBlockElseCond( lexer.yystr()/*.trim().to_string()*/, true ) )
+      Some( TokBlockElseCond( lexer.yystr().trim().to_string(), true ) )
     }
 
 }
@@ -82,8 +82,8 @@ rustlex! HBExpressionLexer {
   property in_params:bool = false;
 
   let NO_WP       = '~';
-  let START       = "{{" ['{''#''/']?;
-  let START_NO_WP = "{{" '{'? NO_WP ['#''/']?;
+  let START       = "{{" ['{''#''/''>']?;
+  let START_NO_WP = "{{" '{'? NO_WP ['#''/''>']?;
   let END         =  '}'? "}}";
 
   let STRING_START = '"';
@@ -120,7 +120,7 @@ rustlex! HBExpressionLexer {
     BRACKET_ID_START => |lexer:&mut HBExpressionLexer<R>| { lexer.ID_ANY(); None }
 
     STRING_START => |lexer:&mut HBExpressionLexer<R>| { lexer.STRING_PARAM(); None } // for parameters only
-    
+
     THIS         => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( ".".to_string()  ) ) }
     THIS_ALIAS   => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( ".".to_string()  ) ) }
     PARENT_ALIAS => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( "..".to_string() ) ) }
@@ -128,7 +128,7 @@ rustlex! HBExpressionLexer {
 
   PROPERTY_PATH {
     ACCESSOR_SEP => |lexer:&mut HBExpressionLexer<R>| { lexer.ACCESSOR(); None }
-    ACCESSOR_END => |lexer:&mut HBExpressionLexer<R>| { 
+    ACCESSOR_END => |lexer:&mut HBExpressionLexer<R>| {
       if lexer.in_options  { lexer.OPTIONS() } else { lexer.PARAMS() };
       if lexer.in_params {
         Some( TokParamSep )
@@ -151,16 +151,16 @@ rustlex! HBExpressionLexer {
   PARAMS {
     PARAMS_SEP   => |    _:&mut HBExpressionLexer<R>| { Some( TokParamSep ) }
     IDENTIFIER   => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( lexer.yystr() ) ) }
-    STRING_START => |lexer:&mut HBExpressionLexer<R>| { lexer.STRING_PARAM(); None } 
+    STRING_START => |lexer:&mut HBExpressionLexer<R>| { lexer.STRING_PARAM(); None }
 
     // end of parameters
-    OPTION_NAME  => |lexer:&mut HBExpressionLexer<R>| {  
-      lexer.in_options = true; 
-      lexer.OPTION_VALUE(); 
-      Some( TokOption( lexer.yystr().as_slice().trim_right_matches('=').to_string() ) ) 
+    OPTION_NAME  => |lexer:&mut HBExpressionLexer<R>| {
+      lexer.in_options = true;
+      lexer.OPTION_VALUE();
+      Some( TokOption( lexer.yystr().as_slice().trim_right_matches('=').to_string() ) )
     }
 
-    // common expression ending 
+    // common expression ending
     NO_WP        => |lexer:&mut HBExpressionLexer<R>| { lexer.FORCE_END(); Some( TokNoWhiteSpaceAfter ) }
     END          => |    _:&mut HBExpressionLexer<R>| { None }
 
@@ -182,9 +182,9 @@ rustlex! HBExpressionLexer {
 
   OPTIONS {
     OPTION_NAME  => |lexer:&mut HBExpressionLexer<R>| {  lexer.OPTION_VALUE(); Some( TokOption( lexer.yystr().as_slice().trim_right_matches('=').to_string() ) ) }
-    PARAMS_SEP    => |_:&mut HBExpressionLexer<R>| { None } 
+    PARAMS_SEP    => |_:&mut HBExpressionLexer<R>| { None }
 
-    // common expression ending 
+    // common expression ending
     NO_WP        => |lexer:&mut HBExpressionLexer<R>| { lexer.FORCE_END(); Some( TokNoWhiteSpaceAfter ) }
     END          => |    _:&mut HBExpressionLexer<R>| { None }
   }
@@ -242,8 +242,8 @@ impl Template {
 }
 
 impl Default for Template {
-  fn default() -> Template { 
-    Template { 
+  fn default() -> Template {
+    Template {
       content: Default::default()
     }
   }
@@ -264,7 +264,7 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpression, (ParseError, Option<St
   let mut path = vec![];
   let mut params = vec![];
   let mut options = vec![];
-  
+
 
   while let Some(tok) = lexer.next() {
     match tok {
@@ -285,7 +285,7 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpression, (ParseError, Option<St
               }
             },
             // options starts here
-            TokOption(opt) => { 
+            TokOption(opt) => {
               let option_name = opt;
               let mut opt_path = vec![];
               let mut opt_val  = None;
@@ -320,8 +320,8 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpression, (ParseError, Option<St
     }
   }
 
-  
-  return  Ok(HBExpression { 
+
+  return  Ok(HBExpression {
     base: path,
     params: params,
     options: options,
@@ -364,7 +364,7 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
             }
           }
         }
-        
+
       },
       TokSimpleExp(_) | TokNoEscapeExp(_) | TokBlockExp(_, _) | TokBlockEndExp(_, _) | TokPartialExp(_, _) | TokBlockElseCond(_, _) => {
         if !sink_trailing_white_space && ! wp_back_track.is_empty() {
@@ -447,14 +447,14 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
                   },
                   _ => panic!("(some_else, Some((block, _))) pattern should always be matched — parse.rs#parse")
                 }
-                
+
               } else {
                 return Err((ParseError::UnmatchedBlock, Some(format!("‘{}’ does not match ‘{}’", hb.path(), parent.path()))))
               }
             }
-            _ => { 
-              return Err((ParseError::UnexpectedBlockClose, Some(format!("‘{}’ does not close any block", hb.path())))) 
-            } 
+            _ => {
+              return Err((ParseError::UnexpectedBlockClose, Some(format!("‘{}’ does not close any block", hb.path()))))
+            }
           }
         }
       }
@@ -498,7 +498,7 @@ mod tests {
 
   #[test]
   fn hb_simple() {
-    assert!(match parse_hb_expression("{{i}}") { 
+    assert!(match parse_hb_expression("{{i}}") {
       Ok(_)  => true,
       Err(_) => false,
     })
@@ -506,7 +506,7 @@ mod tests {
 
   #[test]
   fn hb_simple_base() {
-    match parse_hb_expression("{{i}}") { 
+    match parse_hb_expression("{{i}}") {
       Ok(ok)  => assert_eq!(ok.base, vec!["i"]),
       Err(_)  => (),
     }
@@ -514,7 +514,7 @@ mod tests {
 
   #[test]
   fn hb_simple_base_path() {
-    match parse_hb_expression("{{i.j}}") { 
+    match parse_hb_expression("{{i.j}}") {
       Ok(ok)  => assert_eq!(ok.base, vec!["i", "j"]),
       Err(_)  => (),
     }
@@ -522,7 +522,7 @@ mod tests {
 
   #[test]
   fn hb_simple_base_esc_path() {
-    match parse_hb_expression("{{[i]}}") { 
+    match parse_hb_expression("{{[i]}}") {
       Ok(ok)  => assert_eq!(ok.base, vec!["i"]),
       Err(_)  => (),
     }
@@ -530,7 +530,7 @@ mod tests {
 
   #[test]
   fn hb_simple_this_path() {
-    match parse_hb_expression("{{.}}") { 
+    match parse_hb_expression("{{.}}") {
       Ok(ok)  => assert_eq!(ok.base, vec!["."]),
       Err(_)  => (),
     }
@@ -538,7 +538,7 @@ mod tests {
 
   #[test]
   fn hb_this_path() {
-    match parse_hb_expression("{{./p}}") { 
+    match parse_hb_expression("{{./p}}") {
       Ok(ok)  => assert_eq!(ok.base, vec![".", "p"]),
       Err(_)  => (),
     }
@@ -547,7 +547,7 @@ mod tests {
   #[allow(unused_variables)]
   #[test]
   fn hb_string_param() {
-    match parse_hb_expression(r##"{{p "string"}}"##) { 
+    match parse_hb_expression(r##"{{p "string"}}"##) {
       Ok(HBExpression{ref base, ref params, ref options, ref render_options, ref block, ref else_block})  => {
         assert_eq!(base, &vec!["p"]);
         assert_eq!(match params.get(0).unwrap() { &HBValHolder::String(ref s) => s.clone(), _ => "".to_string()}, "string".to_string());
@@ -559,7 +559,7 @@ mod tests {
   #[allow(unused_variables)]
   #[test]
   fn hb_prop_path_param() {
-    match parse_hb_expression(r##"{{p some.path}}"##) { 
+    match parse_hb_expression(r##"{{p some.path}}"##) {
       Ok(HBExpression{ref base, ref params, ref options, ref render_options, ref block, ref else_block})  => {
         assert_eq!(base, &vec!["p"]);
         assert_eq!(match params.get(0).unwrap() { &HBValHolder::Path(ref p) => p.clone(), _ => vec![]}, vec!["some", "path"]);
@@ -571,7 +571,7 @@ mod tests {
   #[allow(unused_variables)]
   #[test]
   fn hb_2_params() {
-    match parse_hb_expression(r##"{{p some path}}"##) { 
+    match parse_hb_expression(r##"{{p some path}}"##) {
       Ok(HBExpression{ref base, ref params, ref options, ref render_options, ref block, ref else_block})  => {
         assert_eq!(base, &vec!["p"]);
         assert_eq!(match params.get(0).unwrap() { &HBValHolder::Path(ref p) => p.clone(), _ => vec![]}, vec!["some"]);
@@ -584,7 +584,7 @@ mod tests {
   #[allow(unused_variables)]
   #[test]
   fn hb_3_params() {
-    match parse_hb_expression(r##"{{p some.path "with_string" yep}}"##) { 
+    match parse_hb_expression(r##"{{p some.path "with_string" yep}}"##) {
       Ok(HBExpression{ref base, ref params, ref options, ref render_options, ref block, ref else_block})  => {
         assert_eq!(base, &vec!["p"]);
         assert_eq!(match params.get(0).unwrap() { &HBValHolder::Path(ref p) => p.clone(), _ => vec![]}, vec!["some", "path"]);
@@ -598,7 +598,7 @@ mod tests {
   #[allow(unused_variables)]
   #[test]
   fn hb_full_feat_param() {
-    match parse_hb_expression(r##"{{t "… param1" well.[that my baby].[1] ~}}"##) { 
+    match parse_hb_expression(r##"{{t "… param1" well.[that my baby].[1] ~}}"##) {
       Ok(HBExpression{ref base, ref params, ref options, ref render_options, ref block, ref else_block})  => {
         assert_eq!(base, &vec!["t"]);
         assert_eq!(match params.get(0).unwrap() { &HBValHolder::String(ref s) => s.clone(), _ => "".to_string()}, "… param1".to_string());
@@ -612,11 +612,11 @@ mod tests {
   #[allow(unused_variables)]
   #[test]
   fn hb_option() {
-    match parse_hb_expression(r##"{{t opt=u ~}}"##) { 
+    match parse_hb_expression(r##"{{t opt=u ~}}"##) {
       Ok(HBExpression{ref base, ref params, ref options, ref render_options, ref block, ref else_block})  => {
         assert_eq!(base, &vec!["t"]);
-        assert_eq!(("opt".to_string(), vec!["u".to_string()]), match options.get(0).unwrap() { 
-          &(ref o, HBValHolder::Path(ref p)) => (o.clone(), p.clone()), 
+        assert_eq!(("opt".to_string(), vec!["u".to_string()]), match options.get(0).unwrap() {
+          &(ref o, HBValHolder::Path(ref p)) => (o.clone(), p.clone()),
           _ => ("".to_string(), vec![]),
         });
         assert!(render_options.no_trailing_whitespace);
@@ -628,15 +628,15 @@ mod tests {
   #[allow(unused_variables)]
   #[test]
   fn hb_mutli_options() {
-    match parse_hb_expression(r##"{{t opt=u opt2="v" ~}}"##) { 
+    match parse_hb_expression(r##"{{t opt=u opt2="v" ~}}"##) {
       Ok(HBExpression{ref base, ref params, ref options, ref render_options, ref block, ref else_block})  => {
         assert_eq!(base, &vec!["t"]);
-        assert_eq!(("opt".to_string(), vec!["u".to_string()]), match options.get(0).unwrap() { 
-          &(ref o, HBValHolder::Path(ref p)) => (o.clone(), p.clone()), 
+        assert_eq!(("opt".to_string(), vec!["u".to_string()]), match options.get(0).unwrap() {
+          &(ref o, HBValHolder::Path(ref p)) => (o.clone(), p.clone()),
           _ => ("".to_string(), vec![]),
         });
-        assert_eq!(("opt2".to_string(), "v".to_string()), match options.get(1).unwrap() { 
-          &(ref o, HBValHolder::String(ref s)) => (o.clone(), s.clone()), 
+        assert_eq!(("opt2".to_string(), "v".to_string()), match options.get(1).unwrap() {
+          &(ref o, HBValHolder::String(ref s)) => (o.clone(), s.clone()),
           _ => ("".to_string(), "".to_string()),
         });
         assert!(render_options.no_trailing_whitespace);
@@ -648,14 +648,14 @@ mod tests {
   #[allow(unused_variables)]
   #[test]
   fn hb_param_options() {
-    match parse_hb_expression(r##"{{t o.[t}+=] opt="v" ~}}"##) { 
+    match parse_hb_expression(r##"{{t o.[t}+=] opt="v" ~}}"##) {
       Ok(HBExpression{ref base, ref params, ref options, ref render_options, ref block, ref else_block})  => {
         assert_eq!(base, &vec!["t"]);
         assert_eq!(vec!["o", "t}+="], match params.get(0).unwrap() {
           &HBValHolder::Path(ref p) => p.clone(), _ => vec![]
         });
-        assert_eq!(("opt".to_string(), "v".to_string()), match options.get(0).unwrap() { 
-          &(ref o, HBValHolder::String(ref s)) => (o.clone(), s.clone()), 
+        assert_eq!(("opt".to_string(), "v".to_string()), match options.get(0).unwrap() {
+          &(ref o, HBValHolder::String(ref s)) => (o.clone(), s.clone()),
           _ => ("".to_string(), "".to_string()),
         });
         assert!(render_options.no_trailing_whitespace);
@@ -687,7 +687,7 @@ mod tests {
   fn parse_else_block() {
     let p = parse("{{#tada}}i{{else}}o{{/tada}}").unwrap_or(Default::default());;
     assert_eq!(true, match p.content.get(0) {
-      Some(&box HBEntry::Eval(HBExpression {ref base, ref params, ref options, ref render_options, ref block, ref else_block})) => { 
+      Some(&box HBEntry::Eval(HBExpression {ref base, ref params, ref options, ref render_options, ref block, ref else_block})) => {
         match (block, else_block) { (&Some(_), &Some(_)) => true, _ => false }
       },
       _ => false,
