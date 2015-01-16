@@ -4,9 +4,7 @@
 
 #[plugin] extern crate rustlex;
 
-
 extern crate "rustc-serialize" as serialize;
-extern crate log;
 extern crate regex;
 
 pub use self::parse::parse;
