@@ -62,16 +62,14 @@ pub enum HBNodeType<T> {
 
 pub type HBEvalResult = Result<(), IoError>;
 
-
-
-pub trait HBData {
+pub trait HBData  {
   fn write_value(&self, out: &mut Writer) -> HBEvalResult;
   fn typed_node(&self) -> HBNodeType<&HBData>;
   fn as_array(&self) -> Option<Vec<&HBData>>;
   fn get_key(&self, key: &str) -> Option<&HBData>;
   fn as_bool(&self) -> bool;
+  fn keys(&self) -> Option<Vec<&str>>;
 }
-
 
 impl HBData for Json {
 
@@ -139,6 +137,16 @@ impl HBData for Json {
     }
   }
 
+  fn keys(&self) -> Option<Vec<&str>> {
+    match self {
+      &Json::Object(ref o) => {
+        Some(o.keys().map(|k| {k.as_slice()}).collect())
+      },
+      _ => None,
+    }
+  }
+
+
 }
 
 impl HBData for String {
@@ -154,6 +162,7 @@ impl HBData for String {
 
   fn as_array<'a>(&'a self) -> Option<Vec<&'a HBData>> { None }
   fn get_key<'a>(&'a self, _: &str) -> Option<&'a HBData> { None }
+  fn keys(&self) -> Option<Vec<&str>> { None }
 }
 
 pub type HBHelperFunction = fn(params: &[&HBData], options: &HelperOptions, out: &mut Writer, hb_context: &EvalContext) -> HBEvalResult;
