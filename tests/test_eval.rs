@@ -3,6 +3,7 @@ extern crate "rustc-serialize" as serialize;
 
 use serialize::json::Json;
 use std::default::Default;
+use std::collections::HashMap;
 
 use rumblebars::eval;
 use rumblebars::EvalContext;
@@ -101,7 +102,7 @@ fn partial() {
 
   eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
-  assert_eq!(String::from_utf8(buf).unwrap(), "found this data"); 
+  assert_eq!(String::from_utf8(buf).unwrap(), "found this data");
 }
 
 #[test]
@@ -118,7 +119,7 @@ fn partial_block() {
 
   eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
-  assert_eq!(String::from_utf8(buf).unwrap(), "found this data and yep, was found i yep, was found j yep, was found k "); 
+  assert_eq!(String::from_utf8(buf).unwrap(), "found this data and yep, was found i yep, was found j yep, was found k ");
 }
 
  #[allow(unused_variables)]
@@ -137,7 +138,7 @@ fn helper() {
 
   eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
-  assert_eq!(String::from_utf8(buf).unwrap(), "from p eval"); 
+  assert_eq!(String::from_utf8(buf).unwrap(), "from p eval");
 
 }
 
@@ -160,7 +161,7 @@ fn helper_context() {
 
   eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
-  assert_eq!(String::from_utf8(buf).unwrap(), "pouet"); 
+  assert_eq!(String::from_utf8(buf).unwrap(), "pouet");
 
 }
 
@@ -183,7 +184,7 @@ fn helper_val() {
 
   eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
-  assert_eq!(String::from_utf8(buf).unwrap(), "value : toto"); 
+  assert_eq!(String::from_utf8(buf).unwrap(), "value : toto");
 }
 
 fn cd(_: &[&HBData], options: &HelperOptions, out: &mut Writer, _: &EvalContext) -> HBEvalResult {
@@ -205,7 +206,28 @@ fn helper_cond() {
 
   eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
-  assert_eq!(String::from_utf8(buf).unwrap(), "value : p true z false"); 
+  assert_eq!(String::from_utf8(buf).unwrap(), "value : p true z false");
+}
+
+fn globs(_: &[&HBData], options: &HelperOptions, out: &mut Writer, _: &EvalContext) -> HBEvalResult {
+  let val = "stored value".to_string();
+  let mut vars = HashMap::new();
+  vars.insert("@val", &val as &HBData);
+  options.block_ok_with_globals(out, &vars)
+}
+
+#[test]
+fn helper_globals() {
+  let json = Json::from_str(r##"{}"##).ok().unwrap();
+  let tmpl = parse(r##"value : {{#globs p}}{{@val}}{{/globs}}"##).ok().unwrap();
+  let mut eval_ctxt: EvalContext = Default::default();
+  let mut buf: Vec<u8> = Vec::new();
+
+  eval_ctxt.register_helper("globs".to_string(), Helper::new_with_function(globs));
+
+  eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
+
+  assert_eq!(String::from_utf8(buf).unwrap(), "value : stored value");
 }
 
 #[test]
@@ -225,7 +247,7 @@ fn leading_whitespace() {
 
       "##;
 
-  assert_eq!(String::from_utf8(buf).unwrap(), expected); 
+  assert_eq!(String::from_utf8(buf).unwrap(), expected);
 }
 
 
@@ -246,7 +268,7 @@ fn trailing_whitespace() {
 
       Pouet"##;
 
-  assert_eq!(String::from_utf8(buf).unwrap(), expected); 
+  assert_eq!(String::from_utf8(buf).unwrap(), expected);
 }
 
 #[test]
@@ -264,7 +286,7 @@ fn both_whitespace() {
 
   let expected = r##"Pouet pouet"##;
 
-  assert_eq!(String::from_utf8(buf).unwrap(), expected); 
+  assert_eq!(String::from_utf8(buf).unwrap(), expected);
 }
 
 
@@ -284,7 +306,7 @@ fn nested_whitespace() {
   let expected = r##" Uuuuu
       ooOOOO"##;
 
-  assert_eq!(String::from_utf8(buf).unwrap(), expected); 
+  assert_eq!(String::from_utf8(buf).unwrap(), expected);
 }
 
 #[test]
@@ -292,82 +314,82 @@ fn autotrim() {
   {
     let json = Json::from_str(r##"{"p": {}}"##).ok().unwrap();
     let tmpl = parse(r##"
-      {{#p}}    
+      {{#p}}
         o
-  
+
       {{else}}
       {{/p}}
     "##).ok().unwrap();
-  
+
     let eval_ctxt: EvalContext = Default::default();
     let mut buf: Vec<u8> = Vec::new();
-  
+
     eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
-  
+
     let expected = r##"
         o
-  
+
     "##;
-  
-    assert_eq!(String::from_utf8(buf).unwrap(), expected); 
+
+    assert_eq!(String::from_utf8(buf).unwrap(), expected);
   }
 
   {
     let json = Json::from_str(r##"{"p": {"u": {}}}"##).ok().unwrap();
     let tmpl = parse(r##"
-      {{#p}}    
+      {{#p}}
         o
         {{#u}}{{/u}}
 
         {{#u}}
         uU
         {{/u}}
-  
+
       {{else}}
       {{/p}}
     "##).ok().unwrap();
-  
+
     let eval_ctxt: EvalContext = Default::default();
     let mut buf: Vec<u8> = Vec::new();
-  
+
     eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
-  
+
     let expected = r##"
         o
-        
+
 
         uU
-  
+
     "##;
-  
-    assert_eq!(String::from_utf8(buf).unwrap(), expected); 
+
+    assert_eq!(String::from_utf8(buf).unwrap(), expected);
   }
 
   {
     let json = Json::from_str(r##"{"p": {}}"##).ok().unwrap();
     let tmpl = parse(r##"
-      {{#p}}i    
+      {{#p}}i
         o
 
-  
+
       {{else}}o
       {{/p}}
     "##).ok().unwrap();
-  
+
     let eval_ctxt: EvalContext = Default::default();
     let mut buf: Vec<u8> = Vec::new();
-  
+
     eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
-  
+
     let expected = r##"
-      i    
+      i
         o
 
-  
-      
+
+
     "##;
-  
-    assert_eq!(String::from_utf8(buf).unwrap(), expected); 
+
+    assert_eq!(String::from_utf8(buf).unwrap(), expected);
   }
 }
 
