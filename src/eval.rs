@@ -182,9 +182,9 @@ pub struct HelperOptions<'a> {
 // alow dead, only used from user defined helpers
 #[allow(dead_code)]
 impl <'a> HelperOptions<'a> {
-  fn render_template(&self, t: &'a Template, out: &mut Writer) -> HBEvalResult {
+  fn render_template(&self, t: &'a Template, data: &'a HBData, out: &mut Writer) -> HBEvalResult {
     let h = HashMap::new();
-    eval_with_globals(t, self.context, out, self.hb_context, &h, self.context_stack)
+    eval_with_globals(t, data, out, self.hb_context, &h, self.context_stack)
   }
 
   pub fn option_by_name(&self, name: &String) -> Option<&'a(HBData + 'a)> {
@@ -197,14 +197,14 @@ impl <'a> HelperOptions<'a> {
 
   pub fn block_ok(&self, out: &mut Writer) -> HBEvalResult{
     match self.block {
-      Some(t) => self.render_template(t, out),
+      Some(t) => self.render_template(t, self.context, out),
       None    => Ok(()),
     }
   }
 
   pub fn inverse(&self, out: &mut Writer) -> HBEvalResult{
     match self.inverse {
-      Some(t) => self.render_template(t, out),
+      Some(t) => self.render_template(t, self.context, out),
       None    => Ok(()),
     }
   }
