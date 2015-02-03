@@ -153,6 +153,10 @@ rustlex! HBExpressionLexer {
     IDENTIFIER   => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( lexer.yystr() ) ) }
     STRING_START => |lexer:&mut HBExpressionLexer<R>| { lexer.STRING_PARAM(); None }
 
+    THIS         => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( ".".to_string()  ) ) }
+    THIS_ALIAS   => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( ".".to_string()  ) ) }
+    PARENT_ALIAS => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( "..".to_string() ) ) }
+
     // end of parameters
     OPTION_NAME  => |lexer:&mut HBExpressionLexer<R>| {
       lexer.in_options = true;
