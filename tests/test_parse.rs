@@ -31,7 +31,7 @@ fn big_no_err() {
   "##);
   
 
-  assert!((match t { Ok(_) => true, Err((e, mesg)) => { println!("{}", mesg.unwrap_or("".to_string())); false }}))
+  assert!((match t { Ok(_) => true, Err((_, mesg)) => { println!("{}", mesg.unwrap_or("".to_string())); false }}))
 
 }
 
