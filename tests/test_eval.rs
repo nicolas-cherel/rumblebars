@@ -314,6 +314,7 @@ fn autotrim() {
   {
     let json = Json::from_str(r##"{"p": {}}"##).ok().unwrap();
     let tmpl = parse(r##"
+      1)
       {{#p}}
         o
 
@@ -327,6 +328,7 @@ fn autotrim() {
     eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
     let expected = r##"
+      1)
         o
 
     "##;
@@ -337,6 +339,7 @@ fn autotrim() {
   {
     let json = Json::from_str(r##"{"p": {"u": {}}}"##).ok().unwrap();
     let tmpl = parse(r##"
+      2)
       {{#p}}
         o
         {{#u}}{{/u}}
@@ -354,20 +357,14 @@ fn autotrim() {
 
     eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
-    let expected = r##"
-        o
-
-
-        uU
-
-    "##;
-
+    let expected = "\n      2)\n        o\n        \n\n        uU\n\n    "; // one line string due to trailing whitespace
     assert_eq!(String::from_utf8(buf).unwrap(), expected);
   }
 
   {
     let json = Json::from_str(r##"{"p": {}}"##).ok().unwrap();
     let tmpl = parse(r##"
+      3)
       {{#p}}i
         o
 
@@ -381,14 +378,7 @@ fn autotrim() {
 
     eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
-    let expected = r##"
-      i
-        o
-
-
-
-    "##;
-
+    let expected = "\n      3)\n      i\n        o\n\n\n      \n    "; // one line string due to trailing whitespace
     assert_eq!(String::from_utf8(buf).unwrap(), expected);
   }
 }
