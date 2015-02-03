@@ -182,9 +182,13 @@ pub struct HelperOptions<'a> {
 // alow dead, only used from user defined helpers
 #[allow(dead_code)]
 impl <'a> HelperOptions<'a> {
-  fn render_template(&self, t: &'a Template, data: &'a HBData, out: &mut Writer) -> HBEvalResult {
+  fn render_template(&self, template: Option<&'a Template>, data: &'a HBData, out: &mut Writer) -> HBEvalResult {
     let h = HashMap::new();
-    eval_with_globals(t, data, out, self.hb_context, &h, self.context_stack)
+    match template {
+      Some(t) => eval_with_globals(t, data, out, self.hb_context, &h, self.context_stack),
+      None => Ok(()),
+    }
+
   }
 
   pub fn option_by_name(&self, name: &String) -> Option<&'a(HBData + 'a)> {
@@ -195,21 +199,23 @@ impl <'a> HelperOptions<'a> {
     }
   }
 
-  pub fn block_ok(&self, out: &mut Writer) -> HBEvalResult{
-    match self.block {
-      Some(t) => self.render_template(t, self.context, out),
-      None    => Ok(()),
-    }
+  pub fn render_fn(&self, out: &mut Writer) -> HBEvalResult{
+      self.render_template(self.block, self.context, out)
+  }
+
+  pub fn render_fn_with_context(&self, data: &'a HBData, out: &mut Writer) -> HBEvalResult{
+      self.render_template(self.block, data, out)
   }
 
   pub fn inverse(&self, out: &mut Writer) -> HBEvalResult{
-    match self.inverse {
-      Some(t) => self.render_template(t, self.context, out),
-      None    => Ok(()),
-    }
+      self.render_template(self.inverse, self.context, out)
   }
 
-  pub fn block_ok_with_globals(&self, out: &mut Writer, globals: &HashMap<&str, &HBData>) -> HBEvalResult {
+  pub fn inverse_with_context(&self, data: &'a HBData, out: &mut Writer) -> HBEvalResult{
+      self.render_template(self.inverse, data, out)
+  }
+
+  pub fn render_fn_with_context_and_globals(&self, data: &'a HBData, out: &mut Writer, globals: &HashMap<&str, &HBData>) -> HBEvalResult {
     let mut h = HashMap::new();
 
     for (k, v) in self.global_data.iter() {
@@ -220,15 +226,14 @@ impl <'a> HelperOptions<'a> {
       h.insert(*k, *v);
     }
 
-    for k in h.keys() {
-      println!("global {}",  k);
-    }
-
-
     match self.block {
-      Some(t) => eval_with_globals(t, self.context, out, self.hb_context, &h, self.context_stack),
+      Some(t) => eval_with_globals(t, data, out, self.hb_context, &h, self.context_stack),
       None    => Ok(()),
     }
+  }
+
+  pub fn render_fn_with_globals(&self, out: &mut Writer, globals: &HashMap<&str, &HBData>) -> HBEvalResult {
+    self.render_fn_with_context_and_globals(self.context, out, globals)
   }
 }
 
@@ -363,9 +368,14 @@ pub struct EvalContext {
 
 impl Default for EvalContext {
   fn default() -> EvalContext {
+    let mut helpers = HashMap::new();
+
+    helpers.insert("each".to_string(),  Helper::new_with_function(::helpers_builtins::each_helper));
+    helpers.insert("if".to_string(),    Helper::new_with_function(::helpers_builtins::if_helper));
+
     EvalContext {
       partials: Default::default(),
-      helpers: Default::default()
+      helpers: helpers,
     }
   }
 }
