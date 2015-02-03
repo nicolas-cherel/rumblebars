@@ -21,4 +21,5 @@ pub use self::eval::HelperOptionsByName;
 
 mod parse;
 mod eval;
+mod helpers_builtins;
 

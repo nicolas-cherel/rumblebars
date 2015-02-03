@@ -189,7 +189,7 @@ fn helper_val() {
 
 fn cd(_: &[&HBData], options: &HelperOptions, out: &mut Writer, _: &EvalContext) -> HBEvalResult {
   if options.condition {
-    options.block_ok(out)
+    options.render_fn(out)
   } else {
     options.inverse(out)
   }
@@ -213,7 +213,7 @@ fn globs(_: &[&HBData], options: &HelperOptions, out: &mut Writer, _: &EvalConte
   let val = "stored value".to_string();
   let mut vars = HashMap::new();
   vars.insert("@val", &val as &HBData);
-  options.block_ok_with_globals(out, &vars)
+  options.render_fn_with_globals(out, &vars)
 }
 
 #[test]
