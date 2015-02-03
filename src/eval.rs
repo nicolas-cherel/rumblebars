@@ -129,10 +129,10 @@ impl HBData for Json {
 
   fn as_bool(&self) -> bool {
     return match self {
-      &Json::I64(ref i)     => *i == 0,
-      &Json::U64(ref u)     => *u == 0,
-      &Json::F64(ref f)     => (*f == Float::nan() || *f == 0.0),
-      &Json::String(ref s)  => s.as_slice() == "",
+      &Json::I64(ref i)     => *i != 0,
+      &Json::U64(ref u)     => *u != 0,
+      &Json::F64(ref f)     => (*f == Float::nan() || *f != 0.0),
+      &Json::String(ref s)  => s.as_slice() != "",
       &Json::Boolean(ref b) => *b,
       &Json::Null           => false,
       _  => true,
