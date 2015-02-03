@@ -94,7 +94,7 @@ rustlex! HBExpressionLexer {
   let DOT_STARTED = ("." | "..");
 
 
-  let IDENTIFIER = [^'!''"''#''%''&''\'''('')''*''+'',''.''/'';''<''=''>''@''[''\\'']''^''`''{''|''}''~'' ''\t']+;
+  let IDENTIFIER = '@'? [^'!''"''#''%''&''\'''('')''*''+'',''.''/'';''<''=''>''@''[''\\'']''^''`''{''|''}''~'' ''\t']+;
   let BRACKET_ID_START = '[';
   let BRACKET_ID_END   = ']';
   let BRACKETED_ID     = [^']']+;
