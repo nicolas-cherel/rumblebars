@@ -1,6 +1,7 @@
 use std::io::{IoError, Writer};
 use serialize::json::Json;
 use std::collections::HashMap;
+use std::slice::SliceExt;
 use std::num::Float;
 use std::vec::Vec;
 use std::default::Default;
@@ -140,7 +141,9 @@ impl HBData for Json {
   fn keys(&self) -> Option<Vec<&str>> {
     match self {
       &Json::Object(ref o) => {
-        Some(o.keys().map(|k| {k.as_slice()}).collect())
+        let mut keys:Vec<_> = o.keys().map(|k| {k.as_slice()}).collect();
+        keys.sort_by(|&:a, b| a.cmp(b));
+        Some(keys)
       },
       _ => None,
     }
