@@ -203,3 +203,15 @@ fn helper_each_keys() {
 
   assert_eq!(String::from_utf8(buf).unwrap(), "one:1 two:2 three:3 ");
 }
+
+#[test]
+fn helper_lookup() {
+  let json = Json::from_str(r##"{"t": {"j": "../u"}, "u": "u content"}"##).ok().unwrap();
+  let tmpl = parse(r##"{{#t}}{{lookup j}}{{/t}}"##).ok().unwrap();
+  let mut eval_ctxt: EvalContext = Default::default();
+  let mut buf: Vec<u8> = Vec::new();
+
+  eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
+
+  assert_eq!(String::from_utf8(buf).unwrap(), "u content");
+}
