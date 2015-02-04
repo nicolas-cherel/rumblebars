@@ -5,6 +5,7 @@ use std::slice::SliceExt;
 use std::num::Float;
 use std::vec::Vec;
 use std::default::Default;
+use regex::Regex;
 
 use parse::Template;
 use parse::HBEntry;
@@ -194,6 +195,28 @@ pub struct HelperOptions<'a> {
 // alow dead, only used from user defined helpers
 #[allow(dead_code)]
 impl <'a> HelperOptions<'a> {
+
+  // rough handlebars path parsing, not solid AT ALL, but should do the job
+  fn parse_path(path: &str) -> Vec<String> {
+    let path_reg = Regex::new(r##"(\.\.|\.)/?|(@?[^!"#%&\\'()*+,./;<=>\[\]^`{|}~ \t]+)[./]?|\[([^\]]+)\][./]?"##).ok().unwrap();
+    let mut r = Vec::new();
+    for captures1 in path_reg.captures_iter(path) {
+      match (captures1.at(1), captures1.at(2), captures1.at(3)) {
+        (Some(dot), None, None) => {
+          r.push(dot.to_string())
+        },
+        (None, Some(id), None) => {
+          r.push(id.to_string())
+        },
+        (None, None, Some(id)) => {
+          r.push(id.to_string())
+        },
+        _ => (),
+      }
+    }
+    r
+  }
+
   fn render_template(&self, template: Option<&'a Template>, data: &'a HBData, out: &mut Writer) -> HBEvalResult {
     let h = HashMap::new();
     match template {
@@ -208,6 +231,17 @@ impl <'a> HelperOptions<'a> {
       Some(&(_, HBValHolder::String(ref s))) => Some(s as &HBData),
       Some(&(_, HBValHolder::Path(ref p))) => value_for_key_path_in_context(self.context, p, self.context_stack, self.global_data),
       _ => None,
+    }
+  }
+
+  pub fn lookup(&self, key: &HBData) -> Option<&'a (HBData + 'a)> {
+    let mut buf:Vec<u8> = vec![];
+    key.write_value(&mut buf);
+    if let Ok(str_key) = String::from_utf8(buf) {
+      let key_path = HelperOptions::parse_path(str_key.as_slice());
+      value_for_key_path_in_context(self.context, &key_path, self.context_stack, self.global_data)
+    } else {
+      None
     }
   }
 
@@ -545,7 +579,6 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
 
 #[cfg(test)]
 mod tests {
-
   use serialize::json::Json;
   use std::default::Default;
   use std::collections::HashMap;
@@ -553,6 +586,27 @@ mod tests {
   use super::value_for_key_path_in_context;
   use super::HBData;
   use super::eval;
+  use super::HelperOptions;
+
+  #[test]
+  fn basic_keypath_matching() {
+
+    assert_eq!(HelperOptions::parse_path("pouet"), vec!["pouet"]);
+    assert_eq!(HelperOptions::parse_path("."), vec!["."]);
+    assert_eq!(HelperOptions::parse_path("./"), vec!["."]);
+    assert_eq!(HelperOptions::parse_path("[pouet]"), vec!["pouet"]);
+    assert_eq!(HelperOptions::parse_path("[&!'i%%oeiod'].j"), vec!["&!'i%%oeiod'", "j"]);
+    assert_eq!(HelperOptions::parse_path("j.[∂ßé©Ç]"), vec!["j", "∂ßé©Ç"]);
+    assert_eq!(HelperOptions::parse_path("t.f"), vec!["t", "f"]);
+    assert_eq!(HelperOptions::parse_path("t/f"), vec!["t", "f"]);
+    assert_eq!(HelperOptions::parse_path("./prop"), vec![".", "prop"]);
+    assert_eq!(HelperOptions::parse_path("../sibling"), vec!["..", "sibling"]);
+    assert_eq!(HelperOptions::parse_path("@test"), vec!["@test"]);
+    assert_eq!(HelperOptions::parse_path("../@ok"), vec!["..", "@ok"]);
+    assert_eq!(HelperOptions::parse_path("t.f.@g.h.i"), vec!["t", "f", "@g", "h", "i"]);
+    assert_eq!(HelperOptions::parse_path("../@g/h/i"), vec!["..", "@g", "h", "i"]);
+
+  }
 
   #[test]
   fn fetch_key_value() {
