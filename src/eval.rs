@@ -416,8 +416,10 @@ impl Default for EvalContext {
   fn default() -> EvalContext {
     let mut helpers = HashMap::new();
 
-    helpers.insert("each".to_string(),  Helper::new_with_function(::helpers_builtins::each_helper));
-    helpers.insert("if".to_string(),    Helper::new_with_function(::helpers_builtins::if_helper));
+    helpers.insert("each".to_string(),   Helper::new_with_function(::helpers_builtins::each_helper));
+    helpers.insert("if".to_string(),     Helper::new_with_function(::helpers_builtins::if_helper));
+    helpers.insert("unless".to_string(), Helper::new_with_function(::helpers_builtins::unless_helper));
+    helpers.insert("lookup".to_string(), Helper::new_with_function(::helpers_builtins::lookup_helper));
 
     EvalContext {
       partials: Default::default(),
