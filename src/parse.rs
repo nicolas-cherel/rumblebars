@@ -90,9 +90,6 @@ rustlex! HBExpressionLexer {
   let STRING_CTNT  = ("\\\"" | [^'"'])*; // either escaped quote or not quote
   let STRING_END   = ['"'];
 
-  let ACCESSOR_SEP_SLASH = "/";
-  let DOT_STARTED = ("." | "..");
-
 
   let IDENTIFIER = '@'? [^'!''"''#''%''&''\'''('')''*''+'',''.''/'';''<''=''>''@''[''\\'']''^''`''{''|''}''~'' ''\t']+;
   let BRACKET_ID_START = '[';
@@ -101,8 +98,7 @@ rustlex! HBExpressionLexer {
   let ACCESSOR_SEP     = ['.''/'];
   let ACCESSOR_END     = [' ''\t']+;
 
-  let THIS             = "this";
-  let THIS_ALIAS       = ".";
+  let THIS             = "this" | ".";
   let PARENT_ALIAS     = "..";
 
   let PARAMS_SEP       = [' ''\t']+;
@@ -122,7 +118,6 @@ rustlex! HBExpressionLexer {
     STRING_START => |lexer:&mut HBExpressionLexer<R>| { lexer.STRING_PARAM(); None } // for parameters only
 
     THIS         => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( ".".to_string()  ) ) }
-    THIS_ALIAS   => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( ".".to_string()  ) ) }
     PARENT_ALIAS => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( "..".to_string() ) ) }
   }
 
@@ -154,7 +149,6 @@ rustlex! HBExpressionLexer {
     STRING_START => |lexer:&mut HBExpressionLexer<R>| { lexer.STRING_PARAM(); None }
 
     THIS         => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( ".".to_string()  ) ) }
-    THIS_ALIAS   => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( ".".to_string()  ) ) }
     PARENT_ALIAS => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( "..".to_string() ) ) }
 
     // end of parameters
