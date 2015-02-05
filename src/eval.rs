@@ -62,10 +62,88 @@ pub enum HBNodeType<T> {
   Null,
 }
 
+pub enum SafeWriting<'a> {
+  Safe(&'a mut (SafeWriter +'a)),
+  Unsafe(&'a mut (Writer +'a)),
+}
+
+impl <'a> SafeWriting<'a> {
+  fn into_unsafe(&mut self) -> SafeWriting {
+    match self {
+      &mut SafeWriting::Safe(ref mut w) => SafeWriting::Unsafe(w.writer()),
+      &mut SafeWriting::Unsafe(ref mut w) => SafeWriting::Unsafe(w),
+    }
+  }
+}
+
+impl <'a> Writer for SafeWriting<'a> {
+  fn write(&mut self, buf: &[u8]) -> Result<(), IoError> {
+    match self {
+      &mut SafeWriting::Safe(ref mut w)  => w.write(buf),
+      &mut SafeWriting::Unsafe(ref mut w) => w.write(buf),
+    }
+  }
+}
+
+pub trait SafeWriter: Writer {
+  fn writer(&mut self) -> &mut Writer;
+}
+
+
+pub struct HTMLSafeWriter<'a> {
+  w: &'a mut (Writer + 'a)
+}
+
+impl <'a> HTMLSafeWriter<'a> {
+  fn new(writer: &'a mut (Writer + 'a)) -> HTMLSafeWriter {
+    HTMLSafeWriter {
+      w: writer
+    }
+  }
+}
+
+impl <'a> Writer for HTMLSafeWriter<'a> {
+  fn write(&mut self, buf: &[u8]) -> Result<(), IoError> {
+    let lt = "<".as_bytes()[0];
+    let gt = ">".as_bytes()[0];
+
+    let esc_lt = "&lt;".as_bytes();
+    let esc_gt = "&gt;".as_bytes();
+
+    let mut r = Ok(());
+
+    for c in buf.iter() {
+      r = match c {
+        chr if *chr == lt => {
+          self.writer().write(esc_lt)
+        },
+        chr if *chr == gt => {
+          self.writer().write(esc_gt)
+        },
+        chr => {
+          self.writer().write_u8(*chr)
+        }
+      };
+
+      if r.is_err() {
+        break;
+      }
+    }
+
+    r
+  }
+}
+
+impl <'a> SafeWriter for HTMLSafeWriter<'a> {
+  fn writer(&mut self) -> &mut Writer {
+    self.w
+  }
+}
+
 pub type HBEvalResult = Result<(), IoError>;
 
 pub trait HBData  {
-  fn write_value(&self, out: &mut Writer) -> HBEvalResult;
+  fn write_value(&self, out: &mut SafeWriting) -> HBEvalResult;
   fn typed_node(&self) -> HBNodeType<&HBData>;
   fn as_array(&self) -> Option<Vec<&HBData>>;
   fn get_key(&self, key: &str) -> Option<&HBData>;
@@ -84,7 +162,7 @@ impl HBData for Json {
     }
   }
 
-  fn write_value(&self, out: &mut Writer) -> HBEvalResult {
+  fn write_value(&self, out: &mut SafeWriting) -> HBEvalResult {
     return match self {
       &Json::I64(ref i)     => write!(out, "{}", i),
       &Json::U64(ref u)     => write!(out, "{}", u),
@@ -154,7 +232,7 @@ impl HBData for Json {
 }
 
 impl HBData for String {
-  fn write_value(&self, out: &mut Writer) -> HBEvalResult {
+  fn write_value(&self, out: &mut SafeWriting) -> HBEvalResult {
     write!(out, "{}", self)
   }
 
@@ -169,7 +247,7 @@ impl HBData for String {
   fn keys(&self) -> Option<Vec<&str>> { None }
 }
 
-pub type HBHelperFunction = fn(params: &[&HBData], options: &HelperOptions, out: &mut Writer, hb_context: &EvalContext) -> HBEvalResult;
+pub type HBHelperFunction = fn(params: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, hb_context: &EvalContext) -> HBEvalResult;
 
 #[deriving(Copy)]
 pub struct Helper {
@@ -217,7 +295,7 @@ impl <'a> HelperOptions<'a> {
     r
   }
 
-  fn render_template(&self, template: Option<&'a Template>, data: &'a HBData, out: &mut Writer) -> HBEvalResult {
+  fn render_template(&self, template: Option<&'a Template>, data: &'a HBData, out: &mut SafeWriting) -> HBEvalResult {
     let h = HashMap::new();
     match template {
       Some(t) => eval_with_globals(t, data, out, self.hb_context, &h, self.context_stack),
@@ -240,8 +318,12 @@ impl <'a> HelperOptions<'a> {
 
   pub fn lookup_with_context(&self, key: &HBData, context: &HBData) -> Option<&'a (HBData + 'a)>  {
     let mut buf:Vec<u8> = vec![];
+    {
+      let mut html_safe = HTMLSafeWriter::new(&mut buf);
+      let mut s_writer = SafeWriting::Safe(&mut html_safe);
+      key.write_value(&mut s_writer);
+    }
 
-    key.write_value(&mut buf);
     if let Ok(str_key) = String::from_utf8(buf) {
       let key_path = HelperOptions::parse_path(str_key.as_slice());
       value_for_key_path_in_context(unsafe { ::std::mem::transmute(context) }, &key_path, self.context_stack, self.global_data)
@@ -250,23 +332,23 @@ impl <'a> HelperOptions<'a> {
     }
   }
 
-  pub fn render_fn(&self, out: &mut Writer) -> HBEvalResult{
+  pub fn render_fn(&self, out: &mut SafeWriting) -> HBEvalResult{
       self.render_template(self.block, self.context, out)
   }
 
-  pub fn render_fn_with_context(&self, data: &'a HBData, out: &mut Writer) -> HBEvalResult{
+  pub fn render_fn_with_context(&self, data: &'a HBData, out: &mut SafeWriting) -> HBEvalResult{
       self.render_template(self.block, data, out)
   }
 
-  pub fn inverse(&self, out: &mut Writer) -> HBEvalResult{
+  pub fn inverse(&self, out: &mut SafeWriting) -> HBEvalResult{
       self.render_template(self.inverse, self.context, out)
   }
 
-  pub fn inverse_with_context(&self, data: &'a HBData, out: &mut Writer) -> HBEvalResult{
+  pub fn inverse_with_context(&self, data: &'a HBData, out: &mut SafeWriting) -> HBEvalResult{
       self.render_template(self.inverse, data, out)
   }
 
-  pub fn render_fn_with_context_and_globals(&self, data: &'a HBData, out: &mut Writer, globals: &HashMap<&str, &HBData>) -> HBEvalResult {
+  pub fn render_fn_with_context_and_globals(&self, data: &'a HBData, out: &mut SafeWriting, globals: &HashMap<&str, &HBData>) -> HBEvalResult {
     let mut h = HashMap::new();
 
     for (k, v) in self.global_data.iter() {
@@ -283,7 +365,7 @@ impl <'a> HelperOptions<'a> {
     }
   }
 
-  pub fn render_fn_with_globals(&self, out: &mut Writer, globals: &HashMap<&str, &HBData>) -> HBEvalResult {
+  pub fn render_fn_with_globals(&self, out: &mut SafeWriting, globals: &HashMap<&str, &HBData>) -> HBEvalResult {
     self.render_fn_with_context_and_globals(self.context, out, globals)
   }
 }
@@ -351,7 +433,7 @@ impl Helper {
     context: &'a HBData,
     params: &'a [HBValHolder],
     options: &'a [(String, HBValHolder)],
-    out: &'b mut Writer,
+    out: &'b mut SafeWriting,
     hb_context: &'a EvalContext,
     ctxt_stack: &'c Vec<&'a HBData>,
     global_data: &HashMap<&str, &'a HBData>
@@ -389,7 +471,7 @@ impl Helper {
     context: &'a HBData,
     params: &'a [HBValHolder],
     options: &'a [(String, HBValHolder)],
-    out: &'b mut Writer,
+    out: &'b mut SafeWriting,
     hb_context: &'a EvalContext,
     ctxt_stack: &'c Vec<&'a HBData>,
     global_data: &HashMap<&str, &'a HBData>
@@ -461,10 +543,13 @@ pub fn eval(template: &Template, data: &HBData, out: &mut Writer, eval_context: 
   globals.insert("@root", data);
   globals.insert("@log", &log);
 
-  eval_with_globals(template, data, out, eval_context, &globals, &vec![data])
+  let mut html_safe = HTMLSafeWriter::new(out);
+  let mut safe_writer = SafeWriting::Safe(&mut html_safe);
+
+  eval_with_globals(template, data, &mut safe_writer, eval_context, &globals, &vec![data])
 }
 
-pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a HBData, out: &mut Writer, eval_context: &'a EvalContext, global_data: &HashMap<&str, &'c HBData>, context_stack: &Vec<&'b HBData>) -> HBEvalResult {
+pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a HBData, out: &mut SafeWriting, eval_context: &'a EvalContext, global_data: &HashMap<&str, &'c HBData>, context_stack: &Vec<&'b HBData>) -> HBEvalResult {
   let mut stack:Vec<_> = template.iter().rev().map(|e| {
     (e, data, Vec::new())
   }).collect();
@@ -505,12 +590,21 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
           match base.as_slice() {
             [ref single] if eval_context.has_helper_with_name(single.as_slice()) => {
               let helper = eval_context.helper_with_name(single.as_slice()).unwrap();
-              // let helper_params =
-              helper.call_fn(ctxt, params.as_slice(), options.as_slice(), out, eval_context, &ctxt_stack, global_data)
+              if render_options.escape {
+                helper.call_fn(ctxt, params.as_slice(), options.as_slice(), out, eval_context, &ctxt_stack, global_data)
+              } else {
+                helper.call_fn(ctxt, params.as_slice(), options.as_slice(), &mut out.into_unsafe(), eval_context, &ctxt_stack, global_data)
+              }
             },
             _ => match value_for_key_path_in_context(ctxt, base, &ctxt_stack, global_data) {
               Some(v) => match v.typed_node() {
-                HBNodeType::Leaf(_) => v.write_value(out),
+                HBNodeType::Leaf(_) => {
+                  if render_options.escape {
+                    v.write_value(out)
+                  } else {
+                    v.write_value(&mut out.into_unsafe())
+                  }
+                },
                 _ => Ok(()),
               },
               None => Ok(()),
@@ -594,6 +688,8 @@ mod tests {
   use super::HBData;
   use super::eval;
   use super::HelperOptions;
+  use super::HTMLSafeWriter;
+  use super::SafeWriting;
 
   #[test]
   fn basic_keypath_matching() {
@@ -621,7 +717,12 @@ mod tests {
     let mut buf: Vec<u8> = Vec::new();
     let h = HashMap::new();
 
-    value_for_key_path_in_context(&json, &vec!["a".to_string()], &vec![], &h).unwrap().write_value(&mut buf).unwrap();
+    {
+      let mut safe_writer = HTMLSafeWriter::new(&mut buf);
+      let mut html_safe = SafeWriting::Safe(&mut safe_writer);
+      value_for_key_path_in_context(&json, &vec!["a".to_string()], &vec![], &h).unwrap().write_value(&mut html_safe).unwrap();
+    }
+
 
     assert_eq!(String::from_utf8(buf).unwrap(), "1");
   }
@@ -632,7 +733,12 @@ mod tests {
     let mut buf: Vec<u8> = Vec::new();
     let h = HashMap::new();
 
-    value_for_key_path_in_context(&json, &vec!["a".to_string(), "b".to_string()], &vec![], &h).unwrap().write_value(&mut buf).unwrap();
+    {
+      let mut safe_writer = HTMLSafeWriter::new(&mut buf);
+      let mut html_safe = SafeWriting::Safe(&mut safe_writer);
+      value_for_key_path_in_context(&json, &vec!["a".to_string(), "b".to_string()], &vec![], &h).unwrap().write_value(&mut html_safe).unwrap();
+    }
+
 
     assert_eq!(String::from_utf8(buf).unwrap(), "1");
   }
@@ -643,7 +749,12 @@ mod tests {
     let mut buf: Vec<u8> = Vec::new();
     let h = HashMap::new();
 
-    value_for_key_path_in_context(&json, &vec!["a".to_string(), "0".to_string()], &vec![], &h).unwrap().write_value(&mut buf).unwrap();
+    {
+      let mut safe_writer = HTMLSafeWriter::new(&mut buf);
+      let mut html_safe = SafeWriting::Safe(&mut safe_writer);
+      value_for_key_path_in_context(&json, &vec!["a".to_string(), "0".to_string()], &vec![], &h).unwrap().write_value(&mut html_safe).unwrap();
+    }
+
 
     assert_eq!(String::from_utf8(buf).unwrap(), "1");
   }
@@ -654,7 +765,12 @@ mod tests {
     let mut buf: Vec<u8> = Vec::new();
     let h = HashMap::new();
 
-    value_for_key_path_in_context(&json, &vec![".".to_string()], &vec![], &h).unwrap().write_value(&mut buf).unwrap();
+    {
+      let mut safe_writer = HTMLSafeWriter::new(&mut buf);
+      let mut html_safe = SafeWriting::Safe(&mut safe_writer);
+      value_for_key_path_in_context(&json, &vec![".".to_string()], &vec![], &h).unwrap().write_value(&mut html_safe).unwrap();
+    }
+
 
     assert_eq!(String::from_utf8(buf).unwrap(), "hello");
   }
@@ -665,7 +781,12 @@ mod tests {
     let mut buf: Vec<u8> = Vec::new();
     let h = HashMap::new();
 
-    value_for_key_path_in_context(&json, &vec![".".to_string(), "t".to_string()], &vec![], &h).unwrap().write_value(&mut buf).unwrap();
+    {
+      let mut safe_writer = HTMLSafeWriter::new(&mut buf);
+      let mut html_safe = SafeWriting::Safe(&mut safe_writer);
+      value_for_key_path_in_context(&json, &vec![".".to_string(), "t".to_string()], &vec![], &h).unwrap().write_value(&mut html_safe).unwrap();
+    }
+
 
     assert_eq!(String::from_utf8(buf).unwrap(), "hello");
   }

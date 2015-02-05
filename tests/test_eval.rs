@@ -12,6 +12,7 @@ use rumblebars::HelperOptions;
 use rumblebars::HBData;
 use rumblebars::HBEvalResult;
 use rumblebars::parse;
+use rumblebars::SafeWriting;
 
 #[test]
 fn simple_render() {
@@ -123,7 +124,7 @@ fn partial_block() {
 }
 
  #[allow(unused_variables)]
-fn p(params: &[&HBData], options: &HelperOptions, out: &mut Writer, hb_context: &EvalContext) -> HBEvalResult {
+fn p(params: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, hb_context: &EvalContext) -> HBEvalResult {
   write!(out, "from p eval")
 }
 
@@ -143,7 +144,7 @@ fn helper() {
 }
 
 #[allow(unused_variables)]
-fn c(params: &[&HBData], options: &HelperOptions, out: &mut Writer, hb_context: &EvalContext) -> HBEvalResult {
+fn c(params: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, hb_context: &EvalContext) -> HBEvalResult {
   match params {
     [param, ..] => param.write_value(out),
     _ => Ok(()),
@@ -166,7 +167,7 @@ fn helper_context() {
 }
 
 #[allow(unused_variables)]
-fn v(params: &[&HBData], options: &HelperOptions, out: &mut Writer, hb_context: &EvalContext) -> HBEvalResult {
+fn v(params: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, hb_context: &EvalContext) -> HBEvalResult {
   match params {
     [v] => v.write_value(out),
     _ => write!(out, "failed…"),
@@ -187,7 +188,7 @@ fn helper_val() {
   assert_eq!(String::from_utf8(buf).unwrap(), "value : toto");
 }
 
-fn cd(_: &[&HBData], options: &HelperOptions, out: &mut Writer, _: &EvalContext) -> HBEvalResult {
+fn cd(_: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, _: &EvalContext) -> HBEvalResult {
   if options.condition {
     options.render_fn(out)
   } else {
@@ -209,7 +210,7 @@ fn helper_cond() {
   assert_eq!(String::from_utf8(buf).unwrap(), "value : p true z false");
 }
 
-fn globs(_: &[&HBData], options: &HelperOptions, out: &mut Writer, _: &EvalContext) -> HBEvalResult {
+fn globs(_: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, _: &EvalContext) -> HBEvalResult {
   let val = "stored value".to_string();
   let mut vars = HashMap::new();
   vars.insert("@val", &val as &HBData);
@@ -383,6 +384,28 @@ fn autotrim() {
   }
 }
 
+
+#[test]
+fn html_escape() {
+  let json = Json::from_str(r##"{"unsafe": "<script>pawned()</script>"}"##).ok().unwrap();
+  let tmpl = parse(r##"{{unsafe}}"##).ok().unwrap();
+  let mut buf: Vec<u8> = Vec::new();
+
+  eval(&tmpl, &json, &mut buf, &Default::default()).unwrap();
+
+  assert_eq!(String::from_utf8(buf).unwrap(), "&lt;script&gt;pawned()&lt;/script&gt;");
+}
+
+#[test]
+fn html_noescape() {
+  let json = Json::from_str(r##"{"unsafe": "<script>pawned()</script>"}"##).ok().unwrap();
+  let tmpl = parse(r##"{{{unsafe}}}"##).ok().unwrap();
+  let mut buf: Vec<u8> = Vec::new();
+
+  eval(&tmpl, &json, &mut buf, &Default::default()).unwrap();
+
+  assert_eq!(String::from_utf8(buf).unwrap(), "<script>pawned()</script>");
+}
 
 
 

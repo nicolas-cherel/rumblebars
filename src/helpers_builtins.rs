@@ -5,9 +5,10 @@ use eval::HelperOptions;
 use eval::HBData;
 use eval::HBEvalResult;
 use eval::EvalContext;
+use eval::SafeWriting;
 
 
-pub fn if_helper(_: &[&HBData], options: &HelperOptions, out: &mut Writer, _: &EvalContext) -> HBEvalResult {
+pub fn if_helper(_: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, _: &EvalContext) -> HBEvalResult {
   if options.condition {
     options.render_fn(out)
   } else {
@@ -15,7 +16,7 @@ pub fn if_helper(_: &[&HBData], options: &HelperOptions, out: &mut Writer, _: &E
   }
 }
 
-pub fn unless_helper(_: &[&HBData], options: &HelperOptions, out: &mut Writer, _: &EvalContext) -> HBEvalResult {
+pub fn unless_helper(_: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, _: &EvalContext) -> HBEvalResult {
   if options.condition {
     options.inverse(out)
   } else {
@@ -23,7 +24,7 @@ pub fn unless_helper(_: &[&HBData], options: &HelperOptions, out: &mut Writer, _
   }
 }
 
-pub fn each_helper(_: &[&HBData], options: &HelperOptions, out: &mut Writer, _: &EvalContext) -> HBEvalResult {
+pub fn each_helper(_: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, _: &EvalContext) -> HBEvalResult {
   match options.context.as_array() {
     Some(array) => {
       if array.len() > 0 {
@@ -74,7 +75,7 @@ pub fn each_helper(_: &[&HBData], options: &HelperOptions, out: &mut Writer, _: 
   }
 }
 
-pub fn lookup_helper(params: &[&HBData], options: &HelperOptions, out: &mut Writer, _: &EvalContext) -> HBEvalResult {
+pub fn lookup_helper(params: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, _: &EvalContext) -> HBEvalResult {
   match params {
     [key] => {
       match options.lookup(key) {

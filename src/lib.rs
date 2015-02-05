@@ -18,6 +18,7 @@ pub use self::eval::EvalContext;
 pub use self::eval::Helper;
 pub use self::eval::HelperOptions;
 pub use self::eval::HelperOptionsByName;
+pub use self::eval::SafeWriting;
 
 mod parse;
 mod eval;
