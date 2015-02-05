@@ -235,11 +235,16 @@ impl <'a> HelperOptions<'a> {
   }
 
   pub fn lookup(&self, key: &HBData) -> Option<&'a (HBData + 'a)> {
+    self.lookup_with_context(key, self.context)
+  }
+
+  pub fn lookup_with_context(&self, key: &HBData, context: &HBData) -> Option<&'a (HBData + 'a)>  {
     let mut buf:Vec<u8> = vec![];
+
     key.write_value(&mut buf);
     if let Ok(str_key) = String::from_utf8(buf) {
       let key_path = HelperOptions::parse_path(str_key.as_slice());
-      value_for_key_path_in_context(self.context, &key_path, self.context_stack, self.global_data)
+      value_for_key_path_in_context(unsafe { ::std::mem::transmute(context) }, &key_path, self.context_stack, self.global_data)
     } else {
       None
     }

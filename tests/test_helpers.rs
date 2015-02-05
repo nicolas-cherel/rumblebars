@@ -215,3 +215,15 @@ fn helper_lookup() {
 
   assert_eq!(String::from_utf8(buf).unwrap(), "u content");
 }
+
+#[test]
+fn helper_lookup_with_context() {
+  let json = Json::from_str(r##"{"t": {"j": "u.v"}, "u": {"v": "v content"}}"##).ok().unwrap();
+  let tmpl = parse(r##"{{#t}}path is {{j}} : {{lookup @root j}}{{/t}}"##).ok().unwrap();
+  let mut eval_ctxt: EvalContext = Default::default();
+  let mut buf: Vec<u8> = Vec::new();
+
+  eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
+
+  assert_eq!(String::from_utf8(buf).unwrap(), "path is u.v : v content");
+}

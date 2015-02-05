@@ -76,8 +76,14 @@ pub fn each_helper(_: &[&HBData], options: &HelperOptions, out: &mut Writer, _: 
 
 pub fn lookup_helper(params: &[&HBData], options: &HelperOptions, out: &mut Writer, _: &EvalContext) -> HBEvalResult {
   match params {
-    [single, ..] => {
-      match options.lookup(single) {
+    [key] => {
+      match options.lookup(key) {
+        Some(data) => data.write_value(out),
+        None => Ok(())
+      }
+    },
+    [context, key] | [context, key, ..] => {
+      match options.lookup_with_context(key, context) {
         Some(data) => data.write_value(out),
         None => Ok(())
       }
