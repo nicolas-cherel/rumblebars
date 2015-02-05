@@ -30,10 +30,12 @@ pub fn each_helper(_: &[&HBData], options: &HelperOptions, out: &mut SafeWriting
       if array.len() > 0 {
         let mut r = Ok(());
         for (index, item) in array.iter().enumerate() {
-          let mut each_globs = HashMap::new();
           let d_index = index.to_json();
           let first = (index == 0).to_json();
           let last = (index == array.len()-1).to_json();
+
+          let mut each_globs = HashMap::new();
+
           each_globs.insert("@index", &d_index as &HBData);
           each_globs.insert("@first", &first as &HBData);
           each_globs.insert("@last", &last as &HBData);
@@ -54,8 +56,10 @@ pub fn each_helper(_: &[&HBData], options: &HelperOptions, out: &mut SafeWriting
         let mut r = Ok(());
         for &key in keys.iter() {
           if let Some(o) = options.context.get_key(key) {
-            let mut each_globs = HashMap::new();
             let key = key.to_string();
+
+            let mut each_globs = HashMap::new();
+
             each_globs.insert("@key", &key as &HBData);
 
             r = options.render_fn_with_context_and_globals(o, out, &each_globs);

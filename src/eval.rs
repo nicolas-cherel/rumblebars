@@ -1,4 +1,4 @@
-use std::io::{IoError, Writer};
+use std::old_io::{IoError, Writer};
 use serialize::json::Json;
 use std::collections::HashMap;
 use std::slice::SliceExt;
@@ -77,7 +77,7 @@ impl <'a> SafeWriting<'a> {
 }
 
 impl <'a> Writer for SafeWriting<'a> {
-  fn write(&mut self, buf: &[u8]) -> Result<(), IoError> {
+  fn write_all(&mut self, buf: &[u8]) -> Result<(), IoError> {
     match self {
       &mut SafeWriting::Safe(ref mut w)  => w.write(buf),
       &mut SafeWriting::Unsafe(ref mut w) => w.write(buf),
@@ -103,7 +103,7 @@ impl <'a> HTMLSafeWriter<'a> {
 }
 
 impl <'a> Writer for HTMLSafeWriter<'a> {
-  fn write(&mut self, buf: &[u8]) -> Result<(), IoError> {
+  fn write_all(&mut self, buf: &[u8]) -> Result<(), IoError> {
     let lt = "<".as_bytes()[0];
     let gt = ">".as_bytes()[0];
 
@@ -186,7 +186,7 @@ impl HBData for Json {
   fn get_key(&self, key: &str) -> Option<&HBData> {
     return match self {
       &Json::Array(ref a) => {
-        if let Some(num_key) = key.as_slice().parse() {
+        if let Ok(num_key) = key.as_slice().parse() {
           match a.get(num_key) {
             Some(v) => Some(v as &HBData),
             None => None,
@@ -249,7 +249,7 @@ impl HBData for String {
 
 pub type HBHelperFunction = fn(params: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, hb_context: &EvalContext) -> HBEvalResult;
 
-#[deriving(Copy)]
+#[derive(Copy)]
 pub struct Helper {
   helper_func: HBHelperFunction,
 }

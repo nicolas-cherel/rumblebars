@@ -1,4 +1,4 @@
-use std::io::BufReader;
+use std::old_io::BufReader;
 use std::slice;
 use regex::Regex;
 use std::default::Default;
