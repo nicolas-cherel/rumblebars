@@ -241,7 +241,7 @@ impl Copy for ParseError {}
 
 fn parse_hb_expression(exp: &str) -> Result<HBExpression, (ParseError, Option<String>)> {
   let mut lexer = HBExpressionLexer::new(BufReader::new(exp.as_bytes()));
-  let mut render_options = RenderOptions {escape: false, no_leading_whitespace: false, no_trailing_whitespace: false};
+  let mut render_options = RenderOptions {escape: true, no_leading_whitespace: false, no_trailing_whitespace: false};
 
   let mut path = vec![];
   let mut params = vec![];
@@ -373,7 +373,7 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
       },
       TokNoEscapeExp(exp) => {
         if let Ok(mut hb) = parse_hb_expression(exp.as_slice()) {
-          hb.render_options.escape = true;
+          hb.render_options.escape = false;
           stack.last_mut().unwrap().0.push(box HBEntry::Eval(hb))
         }
       },
