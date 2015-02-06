@@ -523,7 +523,7 @@ pub fn eval(template: &Template, data: &HBData, out: &mut Writer, eval_context: 
 
 pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a HBData, out: &mut SafeWriting, eval_context: &'a EvalContext, global_data: &HashMap<&str, &'c HBData>, context_stack: &Vec<&'b HBData>) -> HBEvalResult {
   let mut stack:Vec<_> = template.iter().rev().map(|e| {
-    (e, data, Vec::new())
+    (e, data, context_stack.iter().map(|s| *s).collect::<Vec<_>>())
   }).collect();
 
   while stack.len() > 0 {
