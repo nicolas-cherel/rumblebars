@@ -296,9 +296,8 @@ impl <'a> HelperOptions<'a> {
   }
 
   fn render_template(&self, template: Option<&'a Template>, data: &'a HBData, out: &mut SafeWriting) -> HBEvalResult {
-    let h = HashMap::new();
     match template {
-      Some(t) => eval_with_globals(t, data, out, self.hb_context, &h, self.context_stack),
+      Some(t) => eval_with_globals(t, data, out, self.hb_context, self.global_data, self.context_stack),
       None => Ok(()),
     }
 
