@@ -1,7 +1,5 @@
 use std::old_io::BufReader;
-use std::slice;
 use regex::Regex;
-use std::default::Default;
 
 
 use self::Token::{TokSimpleExp, TokNoEscapeExp, TokBlockExp, TokBlockElseCond, TokBlockEndExp, TokPartialExp, TokRaw};
@@ -314,7 +312,7 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpression, (ParseError, Option<St
 }
 
 pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
-  let mut lexer = HandleBarsLexer::new(BufReader::new(template.as_bytes()));
+  let lexer = HandleBarsLexer::new(BufReader::new(template.as_bytes()));
   let mut raw = String::new();
 
   // parse stack entry tuple: (template, expect else block)

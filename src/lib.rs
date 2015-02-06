@@ -1,6 +1,9 @@
 #![crate_name="rumblebars"]
 #![feature(plugin)]
 #![feature(box_syntax)]
+#![feature(io)]
+#![feature(core)]
+#![feature(std_misc)]
 
 #[plugin] extern crate rustlex;
 

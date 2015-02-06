@@ -318,15 +318,19 @@ impl <'a> HelperOptions<'a> {
 
   pub fn lookup_with_context(&self, key: &HBData, context: &HBData) -> Option<&'a (HBData + 'a)>  {
     let mut buf:Vec<u8> = vec![];
-    {
+    let key_write_ok = {
       let mut html_safe = HTMLSafeWriter::new(&mut buf);
       let mut s_writer = SafeWriting::Safe(&mut html_safe);
-      key.write_value(&mut s_writer);
-    }
+      key.write_value(&mut s_writer)
+    };
 
-    if let Ok(str_key) = String::from_utf8(buf) {
-      let key_path = HelperOptions::parse_path(str_key.as_slice());
-      value_for_key_path_in_context(unsafe { ::std::mem::transmute(context) }, &key_path, self.context_stack, self.global_data)
+    if key_write_ok.is_ok() {
+      if let Ok(str_key) = String::from_utf8(buf) {
+        let key_path = HelperOptions::parse_path(str_key.as_slice());
+        value_for_key_path_in_context(unsafe { ::std::mem::transmute(context) }, &key_path, self.context_stack, self.global_data)
+      } else {
+        None
+      }
     } else {
       None
     }
@@ -393,37 +397,6 @@ impl Helper {
     };
 
     evaluated_params
-  }
-
-  fn build_options_map<'a, 'b>(
-    context:&'a HBData,
-    options: &'a [(String, HBValHolder)],
-    ctxt_stack: &'b Vec<&'a HBData>,
-    global_data: &HashMap<&str, &'a HBData>
-  ) -> HelperOptionsByName<'a>
-  {
-    let mut options_iter = options.iter().map(|&(ref name, ref val)| {
-      match val {
-        &HBValHolder::String(ref s) => Some((name, s as &HBData)),
-        &HBValHolder::Path(ref p) => {
-          if let Some(v) = value_for_key_path_in_context(context, p, ctxt_stack, global_data) {
-            Some((name, v))
-          } else {
-            None
-          }
-        }
-      }
-    });
-
-    let mut h = HashMap::new();
-    for i in options_iter {
-      match i {
-        Some((n, v)) => h.insert(n, v),
-        None => None,
-      };
-    }
-
-    h
   }
 
   fn call_for_block<'a, 'b, 'c>(
@@ -555,8 +528,8 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
   }).collect();
 
   while stack.len() > 0 {
-    if let Some((templ, ctxt, ctxt_stack)) = stack.pop() {
-      let w_ok = match templ {
+    let w_ok = if let Some((templ, ctxt, ctxt_stack)) = stack.pop() {
+      match templ {
         &box HBEntry::Raw(ref s) => {
           out.write_str(s.as_slice())
         },
@@ -613,6 +586,7 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
         },
 
         &box HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref render_options, ref block, ref else_block}) => {
+          render_options.escape; // only suppress unused warning
           match base.as_slice() {
             [ref single] if eval_context.has_helper_with_name(single.as_slice()) => {
               let helper = eval_context.helper_with_name(single.as_slice()).unwrap();
@@ -671,8 +645,12 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
             },
           }
         },
-      };
-    }
+      }
+    } else {
+      Ok(())
+    };
+
+    if w_ok.is_err() { return w_ok };
   }
 
   Ok(())
