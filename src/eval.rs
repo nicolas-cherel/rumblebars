@@ -514,7 +514,7 @@ pub fn eval(template: &Template, data: &HBData, out: &mut Writer, eval_context: 
   let log = "info".to_string();
   let mut globals = HashMap::new();
   globals.insert("@root", data);
-  globals.insert("@log", &log);
+  globals.insert("@level", &log);
 
   let mut html_safe = HTMLSafeWriter::new(out);
   let mut safe_writer = SafeWriting::Safe(&mut html_safe);
