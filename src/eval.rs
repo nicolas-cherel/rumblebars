@@ -339,8 +339,8 @@ impl <'a> HelperOptions<'a> {
       self.render_template(self.block, self.context, out)
   }
 
-  pub fn render_fn_with_context(&self, data: &'a HBData, out: &mut SafeWriting) -> HBEvalResult{
-      self.render_template(self.block, data, out)
+  pub fn render_fn_with_context(&self, data: &HBData, out: &mut SafeWriting) -> HBEvalResult{
+      self.render_template(self.block, unsafe { ::std::mem::transmute(data) }, out)
   }
 
   pub fn inverse(&self, out: &mut SafeWriting) -> HBEvalResult{
