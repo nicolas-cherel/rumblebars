@@ -231,6 +231,29 @@ fn helper_globals() {
   assert_eq!(String::from_utf8(buf).unwrap(), "value : stored value");
 }
 
+fn for_root_check(params: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, _: &EvalContext) -> HBEvalResult {
+  match params.as_slice() {
+    [p] => options.render_fn_with_context(p, out),
+    _ => Ok(()),
+  }
+
+}
+
+#[test]
+fn helper_root_check() {
+  let json = Json::from_str(r##"{"i": "i_root", "c": {"b": "pouet"}}"##).ok().unwrap();
+  let tmpl = parse(r##"{{@root.i}} {{#for_root_check c.b}}{{.}} {{../../i}} {{@root.i}}{{/for_root_check}}"##).ok().unwrap();
+
+  let mut eval_ctxt: EvalContext = Default::default();
+  let mut buf: Vec<u8> = Vec::new();
+
+  eval_ctxt.register_helper("for_root_check".to_string(), Helper::new_with_function(for_root_check));
+
+  eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
+
+  assert_eq!(String::from_utf8(buf).unwrap(), "i_root pouet i_root i_root");
+}
+
 #[test]
 fn leading_whitespace() {
   let json = Json::from_str(r##"{"p": {}}"##).ok().unwrap();
