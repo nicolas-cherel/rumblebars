@@ -230,7 +230,7 @@ pub enum HBEntry {
 pub type Template = Vec<Box<HBEntry>>;
 
 pub enum ParseError {
-  UnkownError, // unknown as ‘still not diagnosed case’, not ’your grandma's TV is set on fire case’
+  UnkownError, // unknown as ‘still not diagnosed’ case, not ’your grandma's TV is set on fire’ case
   UnmatchedBlock,
   UnexpectedBlockClose,
 }
@@ -463,20 +463,6 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
 mod tests {
   use std::default::Default;
   use super::{parse, parse_hb_expression, HBEntry, HBExpression, HBValHolder};
-
-  // commented out due to the error
-  //   error: the trait `core::fmt::String` is not implemented for the type `parse::HBToken`
-  // for println!
-
-  // #[allow(dead_code)]
-  // fn debug_parse_hb(exp: &str) {
-  //   let mut lexer = HBExpressionLexer::new(BufReader::new(exp.as_bytes()));
-  //   println!("{}", exp);
-  //   for tok in *lexer {
-  //     println!("{}", tok);
-  //   }
-
-  // }
 
   #[test]
   fn hb_simple() {
