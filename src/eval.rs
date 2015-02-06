@@ -304,7 +304,7 @@ impl <'a> HelperOptions<'a> {
   }
 
   pub fn option_by_name(&self, name: &String) -> Option<&'a(HBData + 'a)> {
-    match self.options.iter().find(|&&(ref n, ref v)| { n == name }) {
+    match self.options.iter().find(|&&(ref n, _)| { n == name }) {
       Some(&(_, HBValHolder::String(ref s))) => Some(s as &HBData),
       Some(&(_, HBValHolder::Path(ref p))) => value_for_key_path_in_context(self.context, p, self.context_stack, self.global_data),
       _ => None,
