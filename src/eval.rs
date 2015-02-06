@@ -79,8 +79,8 @@ impl <'a> SafeWriting<'a> {
 impl <'a> Writer for SafeWriting<'a> {
   fn write_all(&mut self, buf: &[u8]) -> Result<(), IoError> {
     match self {
-      &mut SafeWriting::Safe(ref mut w)  => w.write(buf),
-      &mut SafeWriting::Unsafe(ref mut w) => w.write(buf),
+      &mut SafeWriting::Safe(ref mut w)  => w.write_all(buf),
+      &mut SafeWriting::Unsafe(ref mut w) => w.write_all(buf),
     }
   }
 }
@@ -115,10 +115,10 @@ impl <'a> Writer for HTMLSafeWriter<'a> {
     for c in buf.iter() {
       r = match c {
         chr if *chr == lt => {
-          self.writer().write(esc_lt)
+          self.writer().write_all(esc_lt)
         },
         chr if *chr == gt => {
-          self.writer().write(esc_gt)
+          self.writer().write_all(esc_gt)
         },
         chr => {
           self.writer().write_u8(*chr)
