@@ -106,9 +106,14 @@ impl <'a> Writer for HTMLSafeWriter<'a> {
   fn write_all(&mut self, buf: &[u8]) -> Result<(), IoError> {
     let lt = "<".as_bytes()[0];
     let gt = ">".as_bytes()[0];
+    let amp = "&".as_bytes()[0];
+    let quot = "\"".as_bytes()[0];
 
     let esc_lt = "&lt;".as_bytes();
     let esc_gt = "&gt;".as_bytes();
+    let esc_amp = "&amp;".as_bytes();
+    let esc_quot = "&quot;".as_bytes();
+
 
     let mut r = Ok(());
 
@@ -119,6 +124,12 @@ impl <'a> Writer for HTMLSafeWriter<'a> {
         },
         chr if *chr == gt => {
           self.writer().write_all(esc_gt)
+        },
+        chr if *chr == amp => {
+          self.writer().write_all(esc_amp)
+        },
+        chr if *chr == quot => {
+          self.writer().write_all(esc_quot)
         },
         chr => {
           self.writer().write_u8(*chr)
