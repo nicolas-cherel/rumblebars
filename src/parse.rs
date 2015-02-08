@@ -218,8 +218,8 @@ pub struct HBExpression {
 impl HBExpression {
   pub fn path(&self) -> String {
     let mut r = String::new();
-    self.base.iter().fold(&mut r, |mut a, i| {a.push_str(i.as_slice()); a.push('.'); a});
-
+    self.base.iter().take(self.base.len() - 1).fold(&mut r, |mut a, i| {a.push_str(i.as_slice()); a.push('.'); a});
+    self.base.last().map(|i| r.push_str(i));
     r
   }
 }
