@@ -33,12 +33,12 @@ rustlex! HandleBarsLexer {
 
     let OPEN  = "{{" '~'?;
     let CLOSE = [' ''\t']* '~'? "}}";
-    let EXP = [^'}']*;
+    let EXP = ([^'}']|'}'[^'}'])*;
 
     let IGN_WP      = [' ''\t']*;
     let BLOCK_EXP   = OPEN '#' EXP CLOSE;
     let END_EXP     = OPEN '/' EXP CLOSE;
-    let NO_ESC_EXP  = OPEN '{' EXP '}' CLOSE;
+    let NO_ESC_EXP  = OPEN '{' EXP '}' CLOSE | OPEN '&' EXP CLOSE;
     let PARTIAL_EXP = OPEN '>' EXP CLOSE;
     let SIMPLE_EXP  = OPEN EXP CLOSE;
     let ELSE_EXP    = OPEN IGN_WP ("else" | '^') IGN_WP CLOSE;
@@ -71,6 +71,8 @@ rustlex! HandleBarsLexer {
     ELSE_TRIM_EXP     => |lexer:&mut HandleBarsLexer<R>| {
       Some( TokBlockElseCond( lexer.yystr().trim().to_string(), true ) )
     }
+
+    COMMENT_EXP       => |lexer:&mut HandleBarsLexer<R>| None
 
 }
 
