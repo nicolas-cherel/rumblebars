@@ -542,7 +542,7 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
     let w_ok = if let Some((templ, ctxt, ctxt_stack)) = stack.pop() {
       match templ {
         &box HBEntry::Raw(ref s) => {
-          out.write_str(s.as_slice())
+          out.into_unsafe().write_str(s.as_slice())
         },
         &box HBEntry::Partial(ref exp) => {
           match exp.base.as_slice() {
