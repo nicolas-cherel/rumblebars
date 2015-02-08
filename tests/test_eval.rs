@@ -410,24 +410,24 @@ fn autotrim() {
 
 #[test]
 fn html_escape() {
-  let json = Json::from_str(r##"{"unsafe": "<script>pawned()</script>"}"##).ok().unwrap();
+  let json = Json::from_str(r##"{"unsafe": "<script lang=\"text/javascript\">pawned()</script>"}"##).ok().unwrap();
   let tmpl = parse(r##"{{unsafe}}"##).ok().unwrap();
   let mut buf: Vec<u8> = Vec::new();
 
   eval(&tmpl, &json, &mut buf, &Default::default()).unwrap();
 
-  assert_eq!(String::from_utf8(buf).unwrap(), "&lt;script&gt;pawned()&lt;/script&gt;");
+  assert_eq!(String::from_utf8(buf).unwrap(), "&lt;script lang=&quot;text/javascript&quot;&gt;pawned()&lt;/script&gt;");
 }
 
 #[test]
 fn html_noescape() {
-  let json = Json::from_str(r##"{"unsafe": "<script>pawned()</script>"}"##).ok().unwrap();
+  let json = Json::from_str(r##"{"unsafe": "<script lang=\"text/javascript\">pawned()</script>"}"##).ok().unwrap();
   let tmpl = parse(r##"{{{unsafe}}}"##).ok().unwrap();
   let mut buf: Vec<u8> = Vec::new();
 
   eval(&tmpl, &json, &mut buf, &Default::default()).unwrap();
 
-  assert_eq!(String::from_utf8(buf).unwrap(), "<script>pawned()</script>");
+  assert_eq!(String::from_utf8(buf).unwrap(), "<script lang=\"text/javascript\">pawned()</script>");
 }
 
 
