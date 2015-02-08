@@ -38,6 +38,7 @@ rustlex! HandleBarsLexer {
     let IGN_WP      = [' ''\t']*;
     let BLOCK_EXP   = OPEN '#' EXP CLOSE;
     let END_EXP     = OPEN '/' EXP CLOSE;
+    let COMMENT_EXP = OPEN '!' EXP CLOSE;
     let NO_ESC_EXP  = OPEN '{' EXP '}' CLOSE | OPEN '&' EXP CLOSE;
     let PARTIAL_EXP = OPEN '>' EXP CLOSE;
     let SIMPLE_EXP  = OPEN EXP CLOSE;
