@@ -562,7 +562,7 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
                   }
                   Ok(())
                 },
-                _ => panic!("partial '{}' not found", exp.path())
+                _ => Ok(())
               }
             }
             [_, ..] => panic!("invalid partial name '{}'", exp.path()),
