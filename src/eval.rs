@@ -224,6 +224,7 @@ impl HBData for Json {
       &Json::String(ref s)  => s.as_slice() != "",
       &Json::Boolean(ref b) => *b,
       &Json::Null           => false,
+      &Json::Array(ref a)   => !a.is_empty(),
       _  => true,
     }
   }
@@ -479,7 +480,8 @@ impl Helper {
 
 pub struct EvalContext {
   partials: HashMap<String, Template>,
-  helpers: HashMap<String, Helper>
+  helpers: HashMap<String, Helper>,
+  falsy: Json,
 }
 
 impl Default for EvalContext {
@@ -495,6 +497,7 @@ impl Default for EvalContext {
     EvalContext {
       partials: Default::default(),
       helpers: helpers,
+      falsy: Json::Null,
     }
   }
 }
@@ -626,28 +629,37 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
             _ => {
               let c_ctxt = value_for_key_path_in_context(ctxt, base, &ctxt_stack, global_data);
 
-              match (c_ctxt, block) {
-                (Some(c), &Some(ref block_found)) => {
+              match (c_ctxt.unwrap_or(&eval_context.falsy), block) {
+                (c, &Some(ref block_found)) => {
                   match c.typed_node() {
-                    HBNodeType::Branch(_) => {
-                      for e in block_found.iter().rev() {
-                        let mut c_stack = ctxt_stack.clone();
-                        c_stack.push(ctxt);
-                        stack.push((e, c, c_stack));
-                      }
-                    },
-                    HBNodeType::Array(a) => {
-                      if let Some(collection) = a.as_array() {
-                        for array_i in collection.iter().rev() {
-                          for e in block_found.iter().rev() {
-                            let mut c_stack = ctxt_stack.clone();
-                            c_stack.push(ctxt);
-                            stack.push((e, *array_i, c_stack));
-                          }
+                    HBNodeType::Branch(_) | HBNodeType::Leaf(_) | HBNodeType::Null => {
+                      if c.as_bool() && !render_options.inverse || !c.as_bool() && render_options.inverse {
+                        for e in block_found.iter().rev() {
+                          let mut c_stack = ctxt_stack.clone();
+                          c_stack.push(ctxt);
+                          stack.push((e, c, c_stack));
                         }
                       }
                     },
-                    _ => (),
+                    HBNodeType::Array(_) => {
+                      let inverse = render_options.inverse;
+                      let collection: Vec<&HBData> = match c.as_array() {
+                        Some(ref a) if inverse &&  a.is_empty() => vec![&eval_context.falsy],
+                        Some(ref a) if inverse && !a.is_empty() => vec![],
+
+                        Some(a) => if !inverse { a } else { vec![] },
+
+                        None if inverse =>  vec![&eval_context.falsy],
+                        None => vec![],
+                      };
+                      for array_i in collection.iter().rev() {
+                        for e in block_found.iter().rev() {
+                          let mut c_stack = ctxt_stack.clone();
+                          c_stack.push(ctxt);
+                          stack.push((e, *array_i, c_stack));
+                        }
+                      }
+                    },
                   }
                 },
                 _ => ()

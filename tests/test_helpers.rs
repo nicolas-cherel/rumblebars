@@ -41,7 +41,7 @@ fn helper_if_true() {
     assert_eq!(String::from_utf8(buf).unwrap(), "ok");
   }
   {
-    let json = Json::from_str(r##"[]"##).ok().unwrap();
+    let json = Json::from_str(r##"[1]"##).ok().unwrap();
     let tmpl = parse(r##"{{#if .}}ok{{else}}ko{{/if}}"##).ok().unwrap();
     let eval_ctxt: EvalContext = Default::default();
     let mut buf: Vec<u8> = Vec::new();
@@ -116,7 +116,7 @@ fn helper_if_false() {
   }
   {
     let json = Json::from_str(r##"[]"##).ok().unwrap();
-    let tmpl = parse(r##"{{#if 1}}ok{{else}}ko{{/if}}"##).ok().unwrap();
+    let tmpl = parse(r##"{{#if .}}ok{{else}}ko{{/if}}"##).ok().unwrap();
     let eval_ctxt: EvalContext = Default::default();
     let mut buf: Vec<u8> = Vec::new();
 
