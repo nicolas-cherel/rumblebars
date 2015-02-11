@@ -17,6 +17,7 @@ fn value_for_key_path_in_context<'a>(
   key_path: &Vec<String>,
   context_stack: &Vec<&'a HBData>,
   global_data: &HashMap<&str, &'a HBData>,
+  compat: bool,
 ) ->  Option<&'a (HBData + 'a)>
 {
   let mut ctxt = Some(data);
@@ -47,7 +48,24 @@ fn value_for_key_path_in_context<'a>(
     }
 
     ctxt = match ctxt {
-      Some(c) => c.get_key(key.as_slice()),
+      Some(c) => {
+        match (compat, c.get_key(key.as_slice())) {
+          (true, None) => {
+            let mut found = None;
+            for o in context_stack.iter().rev() {
+              match o.get_key(key.as_slice()) {
+                v @ Some(_) => {
+                  found = v;
+                  break;
+                },
+                None => (),
+              }
+            }
+            return found
+          },
+          (_, v) => v,
+        }
+      },
       _ => return None, // not found
     }
   }
@@ -318,7 +336,7 @@ impl <'a> HelperOptions<'a> {
   pub fn option_by_name(&self, name: &String) -> Option<&'a(HBData + 'a)> {
     match self.options.iter().find(|&&(ref n, _)| { n == name }) {
       Some(&(_, HBValHolder::String(ref s))) => Some(s as &HBData),
-      Some(&(_, HBValHolder::Path(ref p))) => value_for_key_path_in_context(self.context, p, self.context_stack, self.global_data),
+      Some(&(_, HBValHolder::Path(ref p))) => value_for_key_path_in_context(self.context, p, self.context_stack, self.global_data, self.hb_context.compat),
       _ => None,
     }
   }
@@ -338,7 +356,7 @@ impl <'a> HelperOptions<'a> {
     if key_write_ok.is_ok() {
       if let Ok(str_key) = String::from_utf8(buf) {
         let key_path = HelperOptions::parse_path(str_key.as_slice());
-        value_for_key_path_in_context(unsafe { ::std::mem::transmute(context) }, &key_path, self.context_stack, self.global_data)
+        value_for_key_path_in_context(unsafe { ::std::mem::transmute(context) }, &key_path, self.context_stack, self.global_data, self.hb_context.compat)
       } else {
         None
       }
@@ -401,7 +419,7 @@ impl Helper {
     for v in params.iter() {
       match v {
         &HBValHolder::String(ref s) => evaluated_params.push(s as &HBData),
-        &HBValHolder::Path(ref p) => if let Some(d) = value_for_key_path_in_context(context, p, ctxt_stack, global_data) {
+        &HBValHolder::Path(ref p) => if let Some(d) = value_for_key_path_in_context(context, p, ctxt_stack, global_data, false) {
           evaluated_params.push(d)
         },
       }
@@ -426,7 +444,7 @@ impl Helper {
     let condition = match params.as_slice() {
       [ref val, ..] => match val {
         &HBValHolder::String(ref s) => s.as_bool(),
-        &HBValHolder::Path(ref p) => if let Some(v) = value_for_key_path_in_context(context, p, ctxt_stack, global_data) {
+        &HBValHolder::Path(ref p) => if let Some(v) = value_for_key_path_in_context(context, p, ctxt_stack, global_data, hb_context.compat) {
           v.as_bool()
         } else {
           false
@@ -481,6 +499,7 @@ impl Helper {
 pub struct EvalContext {
   partials: HashMap<String, Template>,
   helpers: HashMap<String, Helper>,
+  pub compat: bool,
   falsy: Json,
 }
 
@@ -497,6 +516,7 @@ impl Default for EvalContext {
     EvalContext {
       partials: Default::default(),
       helpers: helpers,
+      compat: false,
       falsy: Json::Null,
     }
   }
@@ -553,7 +573,7 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
               match eval_context.partial_with_name(single.as_slice()) {
                 Some(t) => {
                   let c_ctxt = if let Some(&HBValHolder::Path(ref p)) = exp.params.get(0) {
-                    value_for_key_path_in_context(ctxt, p, &ctxt_stack, global_data).unwrap_or(ctxt)
+                    value_for_key_path_in_context(ctxt, p, &ctxt_stack, global_data, eval_context.compat).unwrap_or(ctxt)
                   } else {
                     ctxt
                   };
@@ -583,7 +603,7 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
                 helper.call_fn(ctxt, params.as_slice(), options.as_slice(), &mut out.into_unsafe(), eval_context, &ctxt_stack, global_data)
               }
             },
-            _ => match value_for_key_path_in_context(ctxt, base, &ctxt_stack, global_data) {
+            _ => match value_for_key_path_in_context(ctxt, base, &ctxt_stack, global_data, eval_context.compat) {
               Some(v) => match v.typed_node() {
                 HBNodeType::Leaf(_) => {
                   if render_options.escape {
@@ -627,7 +647,7 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
               }
             },
             _ => {
-              let c_ctxt = value_for_key_path_in_context(ctxt, base, &ctxt_stack, global_data);
+              let c_ctxt = value_for_key_path_in_context(ctxt, base, &ctxt_stack, global_data, eval_context.compat);
 
               match (c_ctxt.unwrap_or(&eval_context.falsy), block) {
                 (c, &Some(ref block_found)) => {
@@ -721,7 +741,7 @@ mod tests {
     {
       let mut safe_writer = HTMLSafeWriter::new(&mut buf);
       let mut html_safe = SafeWriting::Safe(&mut safe_writer);
-      value_for_key_path_in_context(&json, &vec!["a".to_string()], &vec![], &h).unwrap().write_value(&mut html_safe).unwrap();
+      value_for_key_path_in_context(&json, &vec!["a".to_string()], &vec![], &h, false).unwrap().write_value(&mut html_safe).unwrap();
     }
 
 
@@ -737,7 +757,7 @@ mod tests {
     {
       let mut safe_writer = HTMLSafeWriter::new(&mut buf);
       let mut html_safe = SafeWriting::Safe(&mut safe_writer);
-      value_for_key_path_in_context(&json, &vec!["a".to_string(), "b".to_string()], &vec![], &h).unwrap().write_value(&mut html_safe).unwrap();
+      value_for_key_path_in_context(&json, &vec!["a".to_string(), "b".to_string()], &vec![], &h, false).unwrap().write_value(&mut html_safe).unwrap();
     }
 
 
@@ -753,7 +773,7 @@ mod tests {
     {
       let mut safe_writer = HTMLSafeWriter::new(&mut buf);
       let mut html_safe = SafeWriting::Safe(&mut safe_writer);
-      value_for_key_path_in_context(&json, &vec!["a".to_string(), "0".to_string()], &vec![], &h).unwrap().write_value(&mut html_safe).unwrap();
+      value_for_key_path_in_context(&json, &vec!["a".to_string(), "0".to_string()], &vec![], &h, false).unwrap().write_value(&mut html_safe).unwrap();
     }
 
 
@@ -769,7 +789,7 @@ mod tests {
     {
       let mut safe_writer = HTMLSafeWriter::new(&mut buf);
       let mut html_safe = SafeWriting::Safe(&mut safe_writer);
-      value_for_key_path_in_context(&json, &vec![".".to_string()], &vec![], &h).unwrap().write_value(&mut html_safe).unwrap();
+      value_for_key_path_in_context(&json, &vec![".".to_string()], &vec![], &h, false).unwrap().write_value(&mut html_safe).unwrap();
     }
 
 
@@ -785,7 +805,7 @@ mod tests {
     {
       let mut safe_writer = HTMLSafeWriter::new(&mut buf);
       let mut html_safe = SafeWriting::Safe(&mut safe_writer);
-      value_for_key_path_in_context(&json, &vec![".".to_string(), "t".to_string()], &vec![], &h).unwrap().write_value(&mut html_safe).unwrap();
+      value_for_key_path_in_context(&json, &vec![".".to_string(), "t".to_string()], &vec![], &h, false).unwrap().write_value(&mut html_safe).unwrap();
     }
 
 
@@ -797,7 +817,7 @@ mod tests {
     let json = Json::from_str(r##"{"a": 1}"##).unwrap();
     let h = HashMap::new();
 
-    match value_for_key_path_in_context(&json, &vec!["a".to_string(), "b".to_string()], &vec![], &h) {
+    match value_for_key_path_in_context(&json, &vec!["a".to_string(), "b".to_string()], &vec![], &h, false) {
       Some(_) => assert!(false),
       None    => assert!(true),
     }
