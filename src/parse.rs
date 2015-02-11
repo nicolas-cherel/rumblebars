@@ -1,18 +1,23 @@
 use std::old_io::BufReader;
 use regex::Regex;
 
-
-use self::Token::{TokSimpleExp, TokNoEscapeExp, TokBlockExp, TokBlockElseCond, TokBlockEndExp, TokPartialExp, TokRaw};
+use self::Trimmer::TokPass;
+use self::Token::{TokSimpleExp, TokNoEscapeExp, TokCommentExp, TokBlockExp, TokBlockElseCond, TokBlockEndExp, TokPartialExp, TokRaw};
 use self::HBToken::{TokPathEntry,TokNoWhiteSpaceBefore, TokNoWhiteSpaceAfter,TokStringParam,TokParamStart, TokParamSep, TokOption};
+
+enum Trimmer {
+  TokPass(String, bool)
+}
 
 enum Token {
   // base template tokens
   TokSimpleExp(String),
   TokNoEscapeExp(String),
-  TokPartialExp(String, bool),
-  TokBlockExp(String, bool, bool),
-  TokBlockElseCond(String, bool),
-  TokBlockEndExp(String, bool),
+  TokCommentExp(String),
+  TokPartialExp(String,),
+  TokBlockExp(String, bool),
+  TokBlockElseCond(String),
+  TokBlockEndExp(String,),
   TokRaw(String),
 }
 
@@ -26,6 +31,57 @@ enum HBToken {
   TokOption(String),
 }
 
+rustlex! HBTemplateTrimmer {
+  token Trimmer;
+
+  let PASS_THROUGH = .;
+
+  let NEW_LINE = '\r'?'\n';
+  let WP = [' ''\t'];
+  let OPEN = "{{" (['#''!''/''>''^'] | WP* ("else" | '^'));
+  let EXP  = ('}'?[^'}'])*;
+  let CLOSE = "}}";
+
+  let MUSTACHE = OPEN EXP CLOSE;
+  let MUSTACHE_STANDALONE_START = WP* MUSTACHE WP* NEW_LINE;
+  let MUSTACHE_STANDALONE       = NEW_LINE WP* MUSTACHE WP* NEW_LINE;
+
+  INITIAL {
+    PASS_THROUGH => |lexer:&mut HBTemplateTrimmer<R>| {
+      lexer.BODY();
+      Some( TokPass( lexer.yystr(), false ) )
+    }
+
+    MUSTACHE_STANDALONE_START => |lexer:&mut HBTemplateTrimmer<R>| {
+      lexer.TRIM_CONT();
+      Some( TokPass( lexer.yystr(), true ) )
+    }
+  }
+
+  BODY {
+    PASS_THROUGH => |lexer:&mut HBTemplateTrimmer<R>| Some( TokPass( lexer.yystr(), false ) )
+
+    MUSTACHE_STANDALONE => |lexer:&mut HBTemplateTrimmer<R>| {
+      lexer.TRIM_CONT();
+      Some( TokPass( lexer.yystr(), true ) )
+    }
+  }
+
+  TRIM_CONT {
+    PASS_THROUGH => |lexer:&mut HBTemplateTrimmer<R>| {
+      lexer.BODY();
+      Some( TokPass( lexer.yystr(), false ) )
+    }
+
+    NEW_LINE => |lexer:&mut HBTemplateTrimmer<R>| { Some( TokPass( lexer.yystr(), false ) ) }
+
+    MUSTACHE_STANDALONE_START => |lexer:&mut HBTemplateTrimmer<R>| {
+      Some( TokPass( lexer.yystr(), true ) )
+    }
+  }
+}
+
+
 rustlex! HandleBarsLexer {
     // expression definitions
     let PASS_THROUGH = .;
@@ -33,88 +89,30 @@ rustlex! HandleBarsLexer {
 
     let OPEN  = "{{" '~'?;
     let CLOSE = [' ''\t']* '~'? "}}";
-    let EXP = ([^'}']|'}'[^'}'])*;
+    let EXP = ('}'?[^'}'])*;
 
     let IGN_WP        = [' ''\t']*;
     let BLOCK_EXP     = OPEN '#' EXP CLOSE;
     let BLOCK_INV_EXP = OPEN '^' EXP CLOSE;
     let END_EXP       = OPEN '/' EXP CLOSE;
     let COMMENT_EXP   = OPEN '!' EXP CLOSE;
-    let NO_ESC_EXP    = OPEN '{' EXP '}' CLOSE | OPEN '&' EXP CLOSE;
+    let NO_ESC_EXP    = OPEN ('{' EXP '}' | '&' EXP) CLOSE;
     let PARTIAL_EXP   = OPEN '>' EXP CLOSE;
     let SIMPLE_EXP    = OPEN EXP CLOSE;
     let ELSE_EXP      = OPEN IGN_WP ("else" | '^') IGN_WP CLOSE;
 
-    // autotrim lexing
-    let BLOCK_TRIM_EXP     = NEW_LINE IGN_WP BLOCK_EXP       IGN_WP NEW_LINE;
-    let BLOCK_INV_TRIM_EXP = NEW_LINE IGN_WP BLOCK_INV_EXP   IGN_WP NEW_LINE;
-    let END_TRIM_EXP       = NEW_LINE IGN_WP END_EXP         IGN_WP NEW_LINE;
-    let PARTIAL_TRIM_EXP   = NEW_LINE IGN_WP PARTIAL_EXP     IGN_WP NEW_LINE;
-    let ELSE_TRIM_EXP      = NEW_LINE IGN_WP ELSE_EXP        IGN_WP NEW_LINE;
-
-    // template start autotrim lexing
-    let INIT_BLOCK_TRIM_EXP     = IGN_WP BLOCK_EXP       IGN_WP NEW_LINE;
-    let INIT_BLOCK_INV_TRIM_EXP = IGN_WP BLOCK_INV_EXP   IGN_WP NEW_LINE;
-    let INIT_PARTIAL_TRIM_EXP   = IGN_WP PARTIAL_EXP     IGN_WP NEW_LINE;
-
     // then rules
+    PASS_THROUGH      => |lexer:&mut HandleBarsLexer<R>| Some( TokRaw( lexer.yystr() ) )
 
-    INITIAL {
-      PASS_THROUGH      => |lexer:&mut HandleBarsLexer<R>| { lexer.BODY(); Some( TokRaw( lexer.yystr() ) ) }
+    SIMPLE_EXP        => |lexer:&mut HandleBarsLexer<R>| Some( TokSimpleExp(     lexer.yystr() ) )
+    NO_ESC_EXP        => |lexer:&mut HandleBarsLexer<R>| Some( TokNoEscapeExp(   lexer.yystr() ) )
+    PARTIAL_EXP       => |lexer:&mut HandleBarsLexer<R>| Some( TokPartialExp(    lexer.yystr() ) )
+    END_EXP           => |lexer:&mut HandleBarsLexer<R>| Some( TokBlockEndExp(   lexer.yystr() ) )
+    BLOCK_EXP         => |lexer:&mut HandleBarsLexer<R>| Some( TokBlockExp(      lexer.yystr(), false ) )
+    BLOCK_INV_EXP     => |lexer:&mut HandleBarsLexer<R>| Some( TokBlockExp(      lexer.yystr(), true  ) )
+    ELSE_EXP          => |lexer:&mut HandleBarsLexer<R>| Some( TokBlockElseCond( lexer.yystr() ) )
 
-      SIMPLE_EXP        => |lexer:&mut HandleBarsLexer<R>| { lexer.BODY(); Some( TokSimpleExp(     lexer.yystr() ) ) }
-      NO_ESC_EXP        => |lexer:&mut HandleBarsLexer<R>| { lexer.BODY(); Some( TokNoEscapeExp(   lexer.yystr() ) ) }
-      PARTIAL_EXP       => |lexer:&mut HandleBarsLexer<R>| { lexer.BODY(); Some( TokPartialExp(    lexer.yystr(), false ) ) }
-      END_EXP           => |lexer:&mut HandleBarsLexer<R>| { lexer.BODY(); Some( TokBlockEndExp(   lexer.yystr(), false ) ) }
-      BLOCK_EXP         => |lexer:&mut HandleBarsLexer<R>| { lexer.BODY(); Some( TokBlockExp(      lexer.yystr(), false, false ) ) }
-      BLOCK_INV_EXP     => |lexer:&mut HandleBarsLexer<R>| { lexer.BODY(); Some( TokBlockExp(      lexer.yystr(), false, true  ) ) }
-      ELSE_EXP          => |lexer:&mut HandleBarsLexer<R>| { lexer.BODY(); Some( TokBlockElseCond( lexer.yystr(), false ) ) }
-
-      INIT_PARTIAL_TRIM_EXP  => |lexer:&mut HandleBarsLexer<R>| {
-        lexer.BODY();
-        Some( TokPartialExp( lexer.yystr().trim().to_string(), false ) )
-      }
-      INIT_BLOCK_INV_TRIM_EXP => |lexer:&mut HandleBarsLexer<R>| {
-        lexer.BODY();
-        Some( TokBlockExp(lexer.yystr().trim().to_string(), false, true) )
-      }
-      INIT_BLOCK_TRIM_EXP    => |lexer:&mut HandleBarsLexer<R>| {
-        lexer.BODY();
-        Some( TokBlockExp(   lexer.yystr().trim().to_string(), false, false ) )
-      }
-
-    }
-
-    BODY {
-      PASS_THROUGH      => |lexer:&mut HandleBarsLexer<R>| Some( TokRaw( lexer.yystr() ) )
-
-      SIMPLE_EXP        => |lexer:&mut HandleBarsLexer<R>| Some( TokSimpleExp(     lexer.yystr() ) )
-      NO_ESC_EXP        => |lexer:&mut HandleBarsLexer<R>| Some( TokNoEscapeExp(   lexer.yystr() ) )
-      PARTIAL_EXP       => |lexer:&mut HandleBarsLexer<R>| Some( TokPartialExp(    lexer.yystr(), false ) )
-      END_EXP           => |lexer:&mut HandleBarsLexer<R>| Some( TokBlockEndExp(   lexer.yystr(), false ) )
-      BLOCK_EXP         => |lexer:&mut HandleBarsLexer<R>| Some( TokBlockExp(      lexer.yystr(), false, false ) )
-      BLOCK_INV_EXP     => |lexer:&mut HandleBarsLexer<R>| Some( TokBlockExp(      lexer.yystr(), false, true  ) )
-      ELSE_EXP          => |lexer:&mut HandleBarsLexer<R>| Some( TokBlockElseCond( lexer.yystr(), false ) )
-
-      PARTIAL_TRIM_EXP  => |lexer:&mut HandleBarsLexer<R>| {
-        Some( TokPartialExp( lexer.yystr().trim().to_string(), true ) )
-      }
-      END_TRIM_EXP      => |lexer:&mut HandleBarsLexer<R>| {
-        Some( TokBlockEndExp(lexer.yystr().trim().to_string(), true ) )
-      }
-      BLOCK_INV_TRIM_EXP => |lexer:&mut HandleBarsLexer<R>| {
-        Some( TokBlockExp(lexer.yystr().trim().to_string(), true, true) )
-      }
-      BLOCK_TRIM_EXP    => |lexer:&mut HandleBarsLexer<R>| {
-        Some( TokBlockExp(   lexer.yystr().trim().to_string(), true, false ) )
-      }
-      ELSE_TRIM_EXP     => |lexer:&mut HandleBarsLexer<R>| {
-        Some( TokBlockElseCond( lexer.yystr().trim().to_string(), true ) )
-      }
-
-      COMMENT_EXP       => |lexer:&mut HandleBarsLexer<R>| None
-
-    }
+    COMMENT_EXP       => |lexer:&mut HandleBarsLexer<R>| Some( TokCommentExp(    lexer.yystr() ) )
 }
 
 rustlex! HBExpressionLexer {
@@ -123,8 +121,8 @@ rustlex! HBExpressionLexer {
   property in_params:bool = false;
 
   let NO_WP       = '~';
-  let START       = "{{" ['{''#''/''>''^']?;
-  let START_NO_WP = "{{" '{'? NO_WP ['#''/''>''^']?;
+  let START       = "{{" ['{''#''/''>''^''&']?;
+  let START_NO_WP = "{{" '{'? NO_WP ['#''/''>''^''&']?;
   let END         =  '}'? "}}";
 
   let STRING_START = '"';
@@ -356,14 +354,38 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpression, (ParseError, Option<St
 }
 
 pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
-  let lexer = HandleBarsLexer::new(BufReader::new(template.as_bytes()));
+
+  let trim_lexer = HBTemplateTrimmer::new(BufReader::new(template.as_bytes()));
+  let mut trimmed = String::new();
+  for tok in trim_lexer {
+    match tok {
+      TokPass(s, trim) => {
+        if trim {
+          for ln in ["\r\n", "\n"].iter() {
+            if s.starts_with(ln) {
+              trimmed.push_str(ln);
+            }
+          }
+        }
+        match trim {
+          true  => trimmed.push_str(s.trim()),
+          false => trimmed.push_str(&s),
+        }
+      }
+    }
+  }
+
+  let end_wp_trimmer = Regex::new("(\r?\n)[:blank:]*(\\{\\{[#!/](?:\\}?[^}])*\\}\\})[:blank:]*(:?\r?\n)?\\z").unwrap();
+  let trimmed = end_wp_trimmer.replace_all(&trimmed,"$1$2");
+
+  let lexer = HandleBarsLexer::new(BufReader::new(trimmed.as_bytes()));
   let mut raw = String::new();
 
   // parse stack entry tuple: (template, expect else block)
   let mut stack = vec![(box vec![], false)];
 
-  let mut sink_leading_white_space = false;
-  let mut sink_trailing_white_space = false;
+  let mut sink_leading_white_space = false; // support of {{~exp}}
+  let mut sink_trailing_white_space = false; // support of {{exp~}}
   let mut wp_back_track = String::new(); // backtrack empty space for whitespace control in HB expression
 
   let wp_regex = Regex::new(r"([:blank:]|\n)").unwrap();
@@ -388,10 +410,10 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
             }
           }
         }
-
       },
-      TokSimpleExp(_) | TokNoEscapeExp(_) | TokBlockExp(_, _, _) | TokBlockEndExp(_, _) | TokPartialExp(_, _) | TokBlockElseCond(_, _) => {
+      TokSimpleExp(_) | TokNoEscapeExp(_) | TokCommentExp(_) | TokBlockExp(_, _) | TokBlockEndExp(_) | TokPartialExp(_) | TokBlockElseCond(_) => {
         if !sink_trailing_white_space && ! wp_back_track.is_empty() {
+
           raw.push_str(wp_back_track.as_slice());
         }
 
@@ -401,9 +423,11 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
           stack.last_mut().unwrap().0.push(box HBEntry::Raw(raw));
           raw = String::new();
         }
-        sink_trailing_white_space = false
+
+        sink_trailing_white_space = false;
       },
-    }
+    };
+
 
     // second match handle handlebars expressions
     match tok {
@@ -419,14 +443,13 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
           stack.last_mut().unwrap().0.push(box HBEntry::Eval(hb))
         }
       },
-      TokPartialExp(exp, trimmed) => {
-        if trimmed { raw.push('\n') }
+      TokCommentExp(_ ) => (),
+      TokPartialExp(exp) => {
         if let Ok(hb) = parse_hb_expression(exp.as_slice()) {
           stack.last_mut().unwrap().0.push(box HBEntry::Partial(hb))
         }
       },
-      TokBlockExp(exp, trimmed, inverse) => {
-        if trimmed { raw.push('\n') }
+      TokBlockExp(exp, inverse) => {
         if let Ok(mut hb) = parse_hb_expression(exp.as_slice()) {
           sink_leading_white_space  = hb.render_options.no_leading_whitespace;
           sink_trailing_white_space = hb.render_options.no_trailing_whitespace;
@@ -435,16 +458,14 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
           stack.push((box vec![], false));
         }
       },
-      TokBlockElseCond(exp, trimmed) => {
-        if trimmed { raw.push('\n') }
+      TokBlockElseCond(exp) => {
         if let Ok(hb) = parse_hb_expression(exp.as_slice()) {
           sink_leading_white_space  = hb.render_options.no_leading_whitespace;
           sink_trailing_white_space = hb.render_options.no_trailing_whitespace;
           stack.push((box vec![], true));
         }
       },
-      TokBlockEndExp(exp, trimmed) => {
-        if trimmed { raw.push('\n') }
+      TokBlockEndExp(exp) => {
         if let Ok(hb) = parse_hb_expression(exp.as_slice()) {
           sink_leading_white_space  = hb.render_options.no_leading_whitespace;
           sink_trailing_white_space = hb.render_options.no_trailing_whitespace;
@@ -486,7 +507,6 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
         }
       }
     }
-
   }
 
   if ! sink_trailing_white_space && ! wp_back_track.is_empty() {

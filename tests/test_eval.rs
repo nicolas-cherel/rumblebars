@@ -270,7 +270,7 @@ mod eval {
 
     let expected = r##"Pouet
 
-        "##;
+"##;
 
     assert_eq!(String::from_utf8(buf).unwrap(), expected);
   }
@@ -402,7 +402,7 @@ mod eval {
 
       eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
-      let expected = "\n        3)\n        i\n          o\n\n\n        \n      "; // one line string due to trailing whitespace
+      let expected = "\n        3)\n        i\n          o\n\n\n        "; // one line string due to trailing whitespace
       assert_eq!(String::from_utf8(buf).unwrap(), expected);
     }
   }
