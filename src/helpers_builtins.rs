@@ -100,7 +100,7 @@ pub fn lookup_helper(params: &[&HBData], options: &HelperOptions, out: &mut Safe
 pub fn with_helper(params: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, _: &EvalContext) -> HBEvalResult {
   match params {
     [context] => options.render_fn_with_context(context, out),
-    _ => Ok(()),
+    _ => options.inverse(out),
   }
 }
 
