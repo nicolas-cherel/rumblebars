@@ -258,7 +258,7 @@ mod eval {
   #[test]
   fn leading_whitespace() {
     let json = Json::from_str(r##"{"p": {}}"##).ok().unwrap();
-    let tmpl = parse(r##"{{~#p}}
+    let tmpl = parse(r##"{{#p~}}
 
         Pouet
 
@@ -289,8 +289,9 @@ mod eval {
 
     eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
-    let expected = r##"
-        Pouet"##;
+    let expected = r##"Pouet
+
+"##;
 
     assert_eq!(String::from_utf8(buf).unwrap(), expected);
   }
@@ -298,11 +299,11 @@ mod eval {
   #[test]
   fn both_whitespace() {
     let json = Json::from_str(r##"{"p": {}}"##).ok().unwrap();
-    let tmpl = parse(r##"{{~#p~}}
+    let tmpl = parse(r##"{{#p~}}
 
         Pouet pouet
 
-        {{/p}}"##).ok().unwrap();
+        {{~/p}}"##).ok().unwrap();
     let eval_ctxt: EvalContext = Default::default();
     let mut buf: Vec<u8> = Vec::new();
 
@@ -327,14 +328,62 @@ mod eval {
 
     eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
-    let expected = r##" Uuuuu
-        ooOOOO"##;
+    let expected = r##"Uuuuu ooOOOO
+"##;
 
     assert_eq!(String::from_utf8(buf).unwrap(), expected);
   }
 
   #[test]
-  fn autotrim() {
+  fn autotrim_first() {
+    let tmpl = parse("{{#p}}\nv{{/p}}").ok().unwrap();
+    let json = Json::from_str(r##"{"p": true}"##).unwrap();
+    let eval_ctxt: EvalContext = Default::default();
+    let mut buf: Vec<u8> = Vec::new();
+
+    eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
+
+    assert_eq!(String::from_utf8(buf).unwrap(), "v");
+  }
+
+  #[test]
+  fn autotrim_last() {
+    let tmpl = parse("{{#p}}v\n{{/p}}").ok().unwrap();
+    let json = Json::from_str(r##"{"p": true}"##).unwrap();
+    let eval_ctxt: EvalContext = Default::default();
+    let mut buf: Vec<u8> = Vec::new();
+
+    eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
+
+    assert_eq!(String::from_utf8(buf).unwrap(), "v\n");
+  }
+
+  #[test]
+  fn autotrim_mid() {
+    let tmpl = parse("o\n{{#p}}\nv\n{{/p}}\nu").ok().unwrap();
+    let json = Json::from_str(r##"{"p": true}"##).unwrap();
+    let eval_ctxt: EvalContext = Default::default();
+    let mut buf: Vec<u8> = Vec::new();
+
+    eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
+
+    assert_eq!(String::from_utf8(buf).unwrap(), "o\nv\nu");
+  }
+
+  #[test]
+  fn autotrim_mid_exp() {
+    let tmpl = parse("o\n{{#p}}\n{{.}}\n{{/p}}\nu").ok().unwrap();
+    let json = Json::from_str(r##"{"p": " "}"##).unwrap();
+    let eval_ctxt: EvalContext = Default::default();
+    let mut buf: Vec<u8> = Vec::new();
+
+    eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
+
+    assert_eq!(String::from_utf8(buf).unwrap(), "o\n \nu");
+  }
+
+  #[test]
+  fn autotrim_pass1() {
     {
       let json = Json::from_str(r##"{"p": {}}"##).ok().unwrap();
       let tmpl = parse(r##"
@@ -351,15 +400,14 @@ mod eval {
 
       eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
-      let expected = r##"
-        1)
-          o
-
-      "##;
+      let expected = "\n        1)\n          o\n\n\n      ";
 
       assert_eq!(String::from_utf8(buf).unwrap(), expected);
     }
+  }
 
+  #[test]
+  fn autotrim_pass2() {
     {
       let json = Json::from_str(r##"{"p": {"u": {}}}"##).ok().unwrap();
       let tmpl = parse(r##"
@@ -381,9 +429,13 @@ mod eval {
 
       eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
-      let expected = "\n        2)\n          o\n          \n\n          uU\n\n      "; // one line string due to trailing whitespace
+      let expected = "\n        2)\n          o\n          \n\n          \n          uU\n\n      "; // one line string due to trailing whitespace
       assert_eq!(String::from_utf8(buf).unwrap(), expected);
     }
+  }
+
+  #[test]
+  fn autotrim_pass3() {
 
     {
       let json = Json::from_str(r##"{"p": {}}"##).ok().unwrap();
@@ -402,7 +454,7 @@ mod eval {
 
       eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
-      let expected = "\n        3)\n        i\n          o\n\n\n        "; // one line string due to trailing whitespace
+      let expected = "\n        3)\n        i\n          o\n\n\n              "; // one line string due to trailing whitespace
       assert_eq!(String::from_utf8(buf).unwrap(), expected);
     }
   }
