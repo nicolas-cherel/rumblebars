@@ -51,10 +51,9 @@ rustlex! HandleBarsLexer {
     let NO_ESC_EXP    = ALL_WP OPEN ('{' EXP '}' | '&' EXP) CLOSE ALL_WP;
     let PARTIAL_EXP   = ALL_WP OPEN '>' EXP CLOSE ALL_WP;
     let SIMPLE_EXP    = ALL_WP OPEN [^'!'] EXP CLOSE ALL_WP;
-    let ELSE_EXP      = ALL_WP OPEN IGN_WP ("else" | '^') IGN_WP CLOSE ALL_WP;
+    let ELSE_EXP      = ALL_WP OPEN ("else" | '^') CLOSE ALL_WP;
 
-    let COMMENT_EXP   = OPEN '!' EXP CLOSE;
-    let COMMENT_TRIM  = NEW_LINE IGN_WP* OPEN '!' EXP CLOSE IGN_WP* NEW_LINE;
+    let COMMENT_EXP   = ALL_WP OPEN '!' EXP CLOSE ALL_WP;
 
     // then rules
     PASS_THROUGH      => |lexer:&mut HandleBarsLexer<R>| Some( TokRaw( lexer.yystr() ) )
@@ -68,7 +67,6 @@ rustlex! HandleBarsLexer {
     ELSE_EXP          => |lexer:&mut HandleBarsLexer<R>| Some( TokBlockElseCond( lexer.yystr() ) )
 
     COMMENT_EXP       => |lexer:&mut HandleBarsLexer<R>| Some( TokCommentExp(    lexer.yystr() ) )
-    COMMENT_TRIM      => |lexer:&mut HandleBarsLexer<R>| Some( TokCommentExp(    lexer.yystr() ) )
 
     ESCAPED_EXP       => |lexer:&mut HandleBarsLexer<R>| Some( TokRaw( "{".to_string()  ) )
     ESCAPED_ESC       => |lexer:&mut HandleBarsLexer<R>| Some( TokRaw( "\\".to_string() ) )
@@ -89,6 +87,10 @@ rustlex! HBExpressionLexer {
   let START       = "{{" ['{''#''/''>''^''&']?;
   let START_NO_WP = "{{" '{'? NO_WP ['#''/''>''^''&']?;
   let END         =  '}'? "}}";
+
+  let COMMENT_START       = "{{!";
+  let COMMENT_START_NO_WP = "{{~!";
+  let COMMENT_CONTENT     = (([^'}''~']|'}' [^'}']|'~' '}' [^'}'])?)*;
 
   let STRING_START = '"';
   let STRING_CTNT  = ("\\\"" | [^'"'])*; // either escaped quote or not quote
@@ -113,6 +115,10 @@ rustlex! HBExpressionLexer {
     START       => |lexer:&mut HBExpressionLexer<R>| { lexer.ACCESSOR(); None }
     START_NO_WP => |lexer:&mut HBExpressionLexer<R>| { lexer.ACCESSOR(); Some(TokNoWhiteSpaceBefore) }
     ALL_WP      => |lexer:&mut HBExpressionLexer<R>| { Some( TokLeadingWhiteSpace( lexer.yystr() ) ) }
+
+    COMMENT_START       => |lexer:&mut HBExpressionLexer<R>| { lexer.COMMENT(); None }
+    COMMENT_START_NO_WP => |lexer:&mut HBExpressionLexer<R>| { lexer.COMMENT(); Some(TokNoWhiteSpaceBefore) }
+
     END         => |lexer:&mut HBExpressionLexer<R>| { lexer.TRAILING_WP(); None }
   }
 
@@ -124,6 +130,7 @@ rustlex! HBExpressionLexer {
 
     THIS         => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( ".".to_string()  ) ) }
     PARENT_ALIAS => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( "..".to_string() ) ) }
+
   }
 
   PROPERTY_PATH {
@@ -190,6 +197,13 @@ rustlex! HBExpressionLexer {
     // common expression ending
     NO_WP        => |lexer:&mut HBExpressionLexer<R>| { lexer.FORCE_END(); Some( TokNoWhiteSpaceAfter ) }
     END          => |lexer:&mut HBExpressionLexer<R>| { lexer.TRAILING_WP(); None }
+  }
+
+  COMMENT {
+    END             => |lexer:&mut HBExpressionLexer<R>| { lexer.FORCE_END(); None }
+    NO_WP           => |lexer:&mut HBExpressionLexer<R>| { lexer.FORCE_END(); Some( TokNoWhiteSpaceAfter ) }
+
+    COMMENT_CONTENT => |lexer:&mut HBExpressionLexer<R>| { None }
   }
 
   FORCE_END {
@@ -352,6 +366,7 @@ enum Unit {
   Append(Option<String>, Box<HBEntry>, Option<String>),
   Shift(Option<String>,  Box<HBEntry>, bool, Option<String>),
   Reduce(Option<String>, Box<HBEntry>, Option<String>),
+  TrimOnly(Option<String>, Box<HBEntry>, Option<String>),
   Skip,
 }
 
@@ -409,18 +424,17 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
           Unit::Skip
         }
       },
-      TokNoEscapeExp(ref exp) => {
-        if let Ok((lead_wp, mut hb, trail_wp)) = parse_hb_expression(exp.as_slice()) {
-          hb.render_options.escape = false;
-          Unit::Append(lead_wp, box HBEntry::Eval(hb), trail_wp)
+      TokCommentExp(ref exp) => {
+        if let Ok((lead_wp, hb, trail_wp)) = parse_hb_expression(exp.as_slice()) {
+          Unit::TrimOnly(lead_wp, box HBEntry::Eval(hb), trail_wp)
         } else {
           Unit::Skip
         }
       },
-      TokCommentExp(exp) => {
-        let new_line_match = regex!("^(\r?\n)");
-        if let Some(Some(new_line)) = new_line_match.captures(&exp).map(|s| s.at(1)) {
-          Unit::Append(None, box HBEntry::Raw(new_line.to_string()), None)
+      TokNoEscapeExp(ref exp) => {
+        if let Ok((lead_wp, mut hb, trail_wp)) = parse_hb_expression(exp.as_slice()) {
+          hb.render_options.escape = false;
+          Unit::Append(lead_wp, box HBEntry::Eval(hb), trail_wp)
         } else {
           Unit::Skip
         }
@@ -489,10 +503,11 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
         };
       },
       // shift or reduce with auto trim
-      autotrimable @ Unit::Shift(..) | autotrimable @ Unit::Reduce(..) => {
+      autotrimable @ Unit::Shift(..) | autotrimable @ Unit::Reduce(..) | autotrimable @ Unit::TrimOnly(..) => {
         let (shift, reduce, lead_wp, entry, is_else, trail_wp) = match autotrimable {
           Unit::Shift(lead_wp, entry, is_else, trail_wp) => (true, false, lead_wp, entry, is_else, trail_wp),
           Unit::Reduce(lead_wp, entry, trail_wp)   => (false, true,  lead_wp, entry, false, trail_wp),
+          Unit::TrimOnly(lead_wp, entry, trail_wp)   => (false, false,  lead_wp, entry, false, trail_wp),
           _ => panic!("rustc did compile some weird case"),
         };
 
