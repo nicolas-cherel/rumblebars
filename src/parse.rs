@@ -200,10 +200,10 @@ rustlex! HBExpressionLexer {
   }
 
   COMMENT {
-    END             => |lexer:&mut HBExpressionLexer<R>| { lexer.FORCE_END(); None }
+    END             => |lexer:&mut HBExpressionLexer<R>| { lexer.TRAILING_WP(); None }
     NO_WP           => |lexer:&mut HBExpressionLexer<R>| { lexer.FORCE_END(); Some( TokNoWhiteSpaceAfter ) }
 
-    COMMENT_CONTENT => |lexer:&mut HBExpressionLexer<R>| { None }
+    COMMENT_CONTENT => |    _:&mut HBExpressionLexer<R>| { None }
   }
 
   FORCE_END {
@@ -414,7 +414,6 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
     // handle each token specifities and distribute them to generic shift/reduce handlings
     let token_result = match tok {
       TokRaw(s) => {
-        println!("found raw {:?}", s);
         Unit::Append(None, box HBEntry::Raw(s), None)
       },
       TokSimpleExp(ref exp) => {
