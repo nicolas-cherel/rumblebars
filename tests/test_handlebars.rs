@@ -57,7 +57,6 @@ mod handlebars {
   }
 
   fn test_handlebars(data: &str, may_fail: bool) {
-    println!("{}", data);
     let test_content = Json::from_str(data).unwrap();
     let null = Json::Null;
     let template = test_content.find("template").unwrap_or(&null).as_string().unwrap_or("-- template missing --");
