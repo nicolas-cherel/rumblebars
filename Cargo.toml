@@ -4,9 +4,7 @@ version = "0.0.1"
 authors = ["Nicolas Cherel"]
 
 [dependencies]
-rustc-serialize = "=0.2.11"
+rustc-serialize = "=0.2.12"
 regex = "0.1"
-
-[dependencies.rustlex]
-# git = "https://github.com/LeoTestard/rustlex"
-git = "https://github.com/kali/rustlex"
+regex_macros = "0.1"
+rustlex = "0.1"

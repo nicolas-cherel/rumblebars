@@ -1,14 +1,19 @@
 #![crate_name="rumblebars"]
 #![feature(plugin)]
+#![feature(box_patterns)]
 #![feature(box_syntax)]
 #![feature(io)]
 #![feature(core)]
 #![feature(std_misc)]
+#![plugin(regex_macros)]
+#![plugin(rustlex)]
 
-#[plugin] extern crate rustlex;
+extern crate regex;
+extern crate regex_macros;
+extern crate rustlex;
 
 extern crate "rustc-serialize" as serialize;
-extern crate regex;
+
 
 pub use self::parse::parse;
 pub use self::parse::ParseError;
