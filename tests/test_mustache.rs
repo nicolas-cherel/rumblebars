@@ -1,5 +1,6 @@
 #![feature(core)]
 #![feature(io)]
+#![feature(path)]
 
 extern crate rumblebars;
 extern crate "rustc-serialize" as serialize;

@@ -1,5 +1,3 @@
-#![feature(path)]
-#![feature(io)]
 
 extern crate rumblebars;
 extern crate "rustc-serialize" as serialize;
@@ -36,11 +34,11 @@ mod handlebars {
     use rumblebars::EvalContext;
     use rumblebars::SafeWriting;
 
-    pub fn test_helper(_: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, _: &EvalContext) -> HBEvalResult {
+    pub fn test_helper(_: &[&HBData], _: &HelperOptions, out: &mut SafeWriting, _: &EvalContext) -> HBEvalResult {
       write!(out, "{}", "found it!")
     }
 
-    pub fn world(_: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, _: &EvalContext) -> HBEvalResult {
+    pub fn world(_: &[&HBData], _: &HelperOptions, out: &mut SafeWriting, _: &EvalContext) -> HBEvalResult {
       write!(out, "{}", "world!")
     }
   }
