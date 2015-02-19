@@ -38,10 +38,10 @@ rustlex! HandleBarsLexer {
     let NEW_LINE     = (['\n'] | ['\r']['\n']);
     let IGN_WP        = [' ''\t']*;
     let ALL_WP        = (NEW_LINE | IGN_WP)*;
-    let PASS_THROUGH  = ALL_WP* ('{'?[^'{'' ''\t''\r''\n''\\'])*;
+    let PASS_THROUGH  = ALL_WP* ('{'?[^'{'' ''\t''\r''\n'])*;
     let ESCAPED_EXP   = '\\' '{';
     let ESCAPED_ESC   = '\\' '\\';
-    let ESCAPED_SKIP  = '\\' '\\'? [^'{''\\'];
+    let ESCAPED_SKIP  = '\\' '\\'? [^'{''\\''\r''\n'];
 
     let BLOCK_EXP     = ALL_WP OPEN '#' EXP CLOSE ALL_WP;
     let BLOCK_INV_EXP = ALL_WP OPEN '^' EXP CLOSE ALL_WP;
@@ -66,8 +66,8 @@ rustlex! HandleBarsLexer {
 
     COMMENT_EXP       => |lexer:&mut HandleBarsLexer<R>| Some( TokCommentExp(    lexer.yystr() ) )
 
-    ESCAPED_EXP       => |lexer:&mut HandleBarsLexer<R>| Some( TokRaw( "{".to_string()  ) )
-    ESCAPED_ESC       => |lexer:&mut HandleBarsLexer<R>| Some( TokRaw( "\\".to_string() ) )
+    ESCAPED_EXP       => |_|                             Some( TokRaw( "{".to_string()  ) )
+    ESCAPED_ESC       => |_|                             Some( TokRaw( "\\".to_string() ) )
     ESCAPED_SKIP      => |lexer:&mut HandleBarsLexer<R>| Some( TokRaw( lexer.yystr()    ) )
 }
 
@@ -201,7 +201,7 @@ rustlex! HBExpressionLexer {
     END             => |lexer:&mut HBExpressionLexer<R>| { lexer.TRAILING_WP(); None }
     NO_WP           => |lexer:&mut HBExpressionLexer<R>| { lexer.FORCE_END(); Some( TokNoWhiteSpaceAfter ) }
 
-    COMMENT_CONTENT => |    _:&mut HBExpressionLexer<R>| { None }
+    COMMENT_CONTENT => |_| { None }
   }
 
   FORCE_END {
