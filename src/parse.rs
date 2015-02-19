@@ -36,7 +36,7 @@ rustlex! HandleBarsLexer {
     let EXP = ('}'?[^'}'])*;
 
     let NEW_LINE     = (['\n'] | ['\r']['\n']);
-    let IGN_WP        = [' ''\t']*;
+    let IGN_WP        = [' ''\t''\r']*;
     let ALL_WP        = (NEW_LINE | IGN_WP)*;
     let PASS_THROUGH  = ALL_WP* ('{'?[^'{'' ''\t''\r''\n''\\'])*;
     let ESCAPED_EXP   = '\\' '{';
@@ -77,7 +77,7 @@ rustlex! HBExpressionLexer {
   property in_params:bool = false;
 
 
-  let NEW_LINE     = (['\n'] | ['\r']['\n']);
+  let NEW_LINE     =  '\r'?'\n';
   let IGN_WP        = [' ''\t']*;
   let ALL_WP        = (NEW_LINE | IGN_WP)+;
 
