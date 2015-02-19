@@ -723,6 +723,10 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
                           c_stack.push(*ctxt);
                           stack.push((e, c, c_stack, indent.clone()));
                         }
+                      } else if let &Some(ref inv_block) = else_block {
+                        for e in inv_block.iter().rev() {
+                          stack.push((e, *ctxt, ctxt_stack.clone(), indent.clone()));
+                        }
                       }
                     },
                     HBNodeType::Array(_) => {
