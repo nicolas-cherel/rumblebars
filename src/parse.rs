@@ -252,10 +252,20 @@ impl HBExpression {
 
 type HBExpressionParsing = (Option<String>, HBExpression, Option<String>);
 
+#[derive(Debug)]
 pub enum HBEntry {
   Raw(String),
   Eval(HBExpression),
   Partial(HBExpression),
+}
+
+impl HBEntry {
+  fn is_partial(&self) -> bool {
+    match self {
+      &HBEntry::Partial(_) => true,
+      _ => false
+    }
+  }
 }
 
 pub type Template = Vec<Box<HBEntry>>;
@@ -287,7 +297,7 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpressionParsing, (ParseError, Op
   while let Some(tok) = lexer.next() {
     match tok {
       TokLeadingWhiteSpace(s) => {
-        let indent_space_matcher = regex!(".*\r?\n([:blank:]*)$");
+        let indent_space_matcher = regex!("([:blank:]*)$");
         render_options.indent = indent_space_matcher.captures(&s).and_then(|s| s.at(1) ).map(|s| s.to_string());
         leading_whitespace = Some(s);
       },
@@ -366,6 +376,7 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpressionParsing, (ParseError, Op
 #[derive(Debug)]
 enum Unit {
   Append(Option<String>, Box<HBEntry>, Option<String>),
+  AppendAutoTrim(Option<String>, Box<HBEntry>, Option<String>),
   Shift(Option<String>,  Box<HBEntry>, bool, Option<String>),
   Reduce(Option<String>, Box<HBEntry>, Option<String>),
   TrimOnly(Option<String>, Box<HBEntry>, Option<String>),
@@ -402,7 +413,7 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
   let end_wp_trimmer = regex!("(\r?\n)[:blank:]*(\\{\\{[#!/](?:\\}?[^}])*\\}\\})[:blank:]*(:?\r?\n)?\\z");
   let trimmed = end_wp_trimmer.replace_all(&template,"$1$2");
 
-  let mut lexer = HandleBarsLexer::new(BufReader::new(trimmed.as_bytes()));
+  let lexer = HandleBarsLexer::new(BufReader::new(trimmed.as_bytes()));
 
   // parse stack entry tuple: (template, is_else_block)
   let mut stack = vec![(box vec![], false)];
@@ -442,7 +453,7 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
       },
       TokPartialExp(ref exp) => {
         if let Ok((lead_wp, hb, trail_wp)) = parse_hb_expression(exp.as_slice()) {
-          Unit::Append(lead_wp, box HBEntry::Partial(hb), trail_wp)
+          Unit::AppendAutoTrim(lead_wp, box HBEntry::Partial(hb), trail_wp)
         } else {
           Unit::Skip
         }
@@ -504,11 +515,15 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
         };
       },
       // shift or reduce with auto trim
-      autotrimable @ Unit::Shift(..) | autotrimable @ Unit::Reduce(..) | autotrimable @ Unit::TrimOnly(..) => {
-        let (shift, reduce, lead_wp, entry, is_else, trail_wp) = match autotrimable {
-          Unit::Shift(lead_wp, entry, is_else, trail_wp) => (true, false, lead_wp, entry, is_else, trail_wp),
-          Unit::Reduce(lead_wp, entry, trail_wp)   => (false, true,  lead_wp, entry, false, trail_wp),
-          Unit::TrimOnly(lead_wp, entry, trail_wp)   => (false, false,  lead_wp, entry, false, trail_wp),
+      autotrimable @ Unit::Shift(..) |
+      autotrimable @ Unit::Reduce(..) |
+      autotrimable @ Unit::TrimOnly(..) |
+      autotrimable @ Unit::AppendAutoTrim(..) => {
+        let (shift, reduce, append, lead_wp, entry, is_else, trail_wp) = match autotrimable {
+          Unit::Shift(lead_wp, entry, is_else, trail_wp)   => (true, false, false, lead_wp, entry, is_else, trail_wp),
+          Unit::Reduce(lead_wp, entry, trail_wp)           => (false, true, false,  lead_wp, entry, false, trail_wp),
+          Unit::AppendAutoTrim(lead_wp, entry, trail_wp)   => (false, false, true,  lead_wp, entry, false, trail_wp),
+          Unit::TrimOnly(lead_wp, entry, trail_wp)         => (false, false, false,  lead_wp, entry, false, trail_wp),
           _ => panic!("rustc did compile some weird case"),
         };
 
@@ -581,11 +596,22 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
         }
 
 
-        if shift {
-          // compilation shifting : entry is pushed, and a new collector is inserted
+        if shift || append {
+          // first, just handle partial trimming specific handling for indentation
+          if trimmed /*&& first*/ && entry.is_partial() {
+            match entry {
+              box HBEntry::Partial(HBExpression {render_options: RenderOptions {indent: Some(ref s), ..}, ..}) => append_entry(&mut stack, box HBEntry::Raw(s.clone())),
+              _ => ()
+            }
+          }
 
+          // append, push entry into current collector
           append_entry(&mut stack, entry);
-          stack.push((box vec![], is_else));
+
+          if shift {
+            // compilation shifting : entry was pushed, and a new collector is inserted
+            stack.push((box vec![], is_else));
+          }
 
         } else if reduce {
           // reducing : inspect stack and reduce last elligible token collectors into their parent
