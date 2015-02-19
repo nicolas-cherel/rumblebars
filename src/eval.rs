@@ -428,7 +428,7 @@ impl <'a> HelperOptions<'a> {
       self.render_template(self.inverse, data, out)
   }
 
-  pub fn render_fn_with_context_and_globals(&self, data: &'a HBData, out: &mut SafeWriting, globals: &HashMap<&str, &HBData>) -> HBEvalResult {
+  pub fn render_fn_with_context_and_globals(&self, data: &HBData, out: &mut SafeWriting, globals: &HashMap<&str, &HBData>) -> HBEvalResult {
     let mut h = HashMap::new();
 
     for (k, v) in self.global_data.iter() {
@@ -440,7 +440,7 @@ impl <'a> HelperOptions<'a> {
     }
 
     match self.block {
-      Some(t) => eval_with_globals(t, data, out, self.hb_context, &h, self.context_stack, None),
+      Some(t) => eval_with_globals(t, unsafe {::std::mem::transmute(data)}, out, self.hb_context, &h, self.context_stack, None),
       None    => Ok(()),
     }
   }
