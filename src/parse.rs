@@ -38,7 +38,7 @@ rustlex! HandleBarsLexer {
     let NEW_LINE     = (['\n'] | ['\r']['\n']);
     let IGN_WP        = [' ''\t']*;
     let ALL_WP        = (NEW_LINE | IGN_WP)*;
-    let PASS_THROUGH  = ALL_WP* ('{'?[^'{'' ''\t''\r''\n'])*;
+    let PASS_THROUGH  = ALL_WP* ('{'?[^'{'' ''\t''\r''\n''\\'])*;
     let ESCAPED_EXP   = '\\' '{';
     let ESCAPED_ESC   = '\\' '\\';
     let ESCAPED_SKIP  = '\\' '\\'? [^'{''\\''\r''\n'];
