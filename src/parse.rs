@@ -15,7 +15,7 @@ enum Token {
   TokBlockEndExp(String,),
   TokRaw(String),
 }
-#[derive(Debug)]
+
 enum HBToken {
   TokPathEntry(String),
   TokNoWhiteSpaceBefore,
