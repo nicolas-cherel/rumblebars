@@ -83,6 +83,10 @@ mod handlebars {
       _ => (),
     }
 
+
+    println!("{:?}", template);
+    println!("{:?}", &tmpl);
+    println!("{:?}", expected);
     ::rumblebars::eval(&tmpl, ev_data, &mut buf, &eval_context).unwrap_or(());
 
     if ! may_fail {
@@ -91,8 +95,10 @@ mod handlebars {
   }
 
   // static list of handlebars tests known to fail
-  static UNSUPPORTED_HANDLEBARS_FEATURES_CASES: [&'static str; 1] = [
-    "{\"template\":\"{{foo}}\",\"data\":{\"bar_foo\":\"food\"},\"expected\":\"food\"}"
+  static UNSUPPORTED_HANDLEBARS_FEATURES_CASES: [&'static str; 2] = [
+    "{\"template\":\"{{foo}}\",\"data\":{\"bar_foo\":\"food\"},\"expected\":\"food\"}", // js version depends on custom lookup
+    "{\"template\":\"Awesome\\\\\",\"data\":{},\"expected\":\"Awesome\\\\\",\"message\":\"text is escaped so that the closing quote can't be ignored\"}", // some escaping problem on test extraction
+
   ];
 
   macro_rules! hbtest{
