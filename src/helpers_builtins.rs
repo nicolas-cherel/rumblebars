@@ -24,8 +24,10 @@ pub fn unless_helper(_: &[&HBData], options: &HelperOptions, out: &mut SafeWriti
   }
 }
 
-pub fn each_helper(_: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, _: &EvalContext) -> HBEvalResult {
-  match options.context.as_array() {
+pub fn each_helper(params: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, _: &EvalContext) -> HBEvalResult {
+  let use_context = params.first().map(|&c| c).unwrap_or(options.context);
+
+  match use_context.as_array() {
     Some(array) => {
       if array.len() > 0 {
         let mut r = Ok(());
@@ -51,7 +53,7 @@ pub fn each_helper(_: &[&HBData], options: &HelperOptions, out: &mut SafeWriting
         options.inverse(out)
       }
     },
-    None => if let Some(keys) = options.context.keys() {
+    None => if let Some(keys) = use_context.keys() {
       if keys.len() > 0 {
         let mut r = Ok(());
         for &key in keys.iter() {
