@@ -22,6 +22,7 @@ fn value_for_key_path_in_context<'a>(
 {
   let mut ctxt = Some(data);
   let mut stack_index = 0;
+  let mut first_key = true;
 
   for key in key_path.iter() {
     match key.as_slice() {
@@ -49,8 +50,8 @@ fn value_for_key_path_in_context<'a>(
 
     ctxt = match ctxt {
       Some(c) => {
-        match (compat, c.get_key(key.as_slice())) {
-          (true, None) => {
+        match (compat, first_key, c.get_key(key.as_slice())) {
+          (true, true, None) => {
             let mut found = None;
             for o in context_stack.iter().rev() {
               match o.get_key(key.as_slice()) {
@@ -63,11 +64,13 @@ fn value_for_key_path_in_context<'a>(
             }
             found
           },
-          (_, v) => v,
+          (_, _, v) => v,
         }
       },
       _ => return None, // not found
-    }
+    };
+
+    first_key = false;
   }
 
   return ctxt;
