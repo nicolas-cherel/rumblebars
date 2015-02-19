@@ -462,20 +462,16 @@ impl Helper {
     context: &'a HBData,
     params: &'a [HBValHolder],
     ctxt_stack: &'b Vec<&'a HBData>,
-    global_data: &HashMap<&str, &'a HBData>
+    global_data: &HashMap<&str, &'a HBData>,
+    hb_context: &'a EvalContext,
   ) -> Vec<&'a (HBData + 'a)>
   {
-    let mut evaluated_params: Vec<&HBData> = vec![];
-    for v in params.iter() {
+    params.iter().map(|v| {
       match v {
-        &HBValHolder::String(ref s) => evaluated_params.push(s as &HBData),
-        &HBValHolder::Path(ref p) => if let Some(d) = value_for_key_path_in_context(context, p, ctxt_stack, global_data, false) {
-          evaluated_params.push(d)
-        },
+        &HBValHolder::String(ref s) => s as &HBData,
+        &HBValHolder::Path(ref p) => value_for_key_path_in_context(context, p, ctxt_stack, global_data, false).unwrap_or(&hb_context.falsy),
       }
-    };
-
-    evaluated_params
+    }).collect::<Vec<_>>()
   }
 
   fn call_for_block<'a, 'b, 'c>(
@@ -515,7 +511,7 @@ impl Helper {
       context_stack: unsafe { ::std::mem::transmute(ctxt_stack) },
     };
 
-    (self.helper_func)(Helper::build_param_vec(context, params, ctxt_stack, global_data).as_slice(), &helper_options, out, hb_context)
+    (self.helper_func)(Helper::build_param_vec(context, params, ctxt_stack, global_data, hb_context).as_slice(), &helper_options, out, hb_context)
   }
 
   fn call_fn<'a, 'b, 'c>(
@@ -540,7 +536,7 @@ impl Helper {
       context_stack: unsafe { ::std::mem::transmute(ctxt_stack) },
     };
 
-    (self.helper_func)(Helper::build_param_vec(context, params, ctxt_stack, global_data).as_slice(), &helper_options, out, hb_context)
+    (self.helper_func)(Helper::build_param_vec(context, params, ctxt_stack, global_data, hb_context).as_slice(), &helper_options, out, hb_context)
   }
 
 }
