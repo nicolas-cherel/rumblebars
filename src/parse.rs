@@ -15,7 +15,7 @@ enum Token {
   TokBlockEndExp(String,),
   TokRaw(String),
 }
-
+#[derive(Debug)]
 enum HBToken {
   TokPathEntry(String),
   TokNoWhiteSpaceBefore,
@@ -216,11 +216,13 @@ rustlex! HBExpressionLexer {
 
 }
 
+#[derive(Debug)]
 pub enum HBValHolder {
   String(String),
   Path(Vec<String>),
 }
 
+#[derive(Debug)]
 pub struct RenderOptions {
   pub escape: bool,
   pub inverse: bool,
@@ -229,6 +231,7 @@ pub struct RenderOptions {
   pub no_trailing_whitespace: bool,
 }
 
+#[derive(Debug)]
 pub struct HBExpression {
   pub base: Vec<String>,
   pub params: Vec<HBValHolder>,
@@ -360,6 +363,7 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpressionParsing, (ParseError, Op
 }
 
 // after handling parsed token, handle result and leading/trailing whitespace
+#[derive(Debug)]
 enum Unit {
   Append(Option<String>, Box<HBEntry>, Option<String>),
   Shift(Option<String>,  Box<HBEntry>, bool, Option<String>),
