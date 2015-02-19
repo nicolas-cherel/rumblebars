@@ -80,6 +80,53 @@ pub enum HBNodeType<T> {
   Null,
 }
 
+struct IndentWriter<'a> {
+  w: &'a mut SafeWriting<'a>,
+  indent: Option<String>,
+}
+
+impl <'a> IndentWriter<'a> {
+  fn with_indent(s: Option<String>, out: &mut SafeWriting, funkt: &Fn(&mut SafeWriting) -> Result<(), IoError>) -> Result<(), IoError> {
+    let mut indenter = IndentWriter {w: unsafe { ::std::mem::transmute(out) }, indent: s};
+    let mut safe = SafeWriting::Unsafe(&mut indenter);
+    funkt(&mut safe)
+  }
+}
+
+impl <'a> Writer for IndentWriter<'a> {
+  fn write_all(&mut self, buf: &[u8]) -> Result<(), IoError> {
+    match self.indent {
+      None => self.w.write_all(buf),
+      Some(ref indent_str) => {
+        let nl = "\n".as_bytes()[0];
+
+        let mut r = Ok(());
+        for c in buf.iter() {
+          r = match c {
+            &chr if chr == nl => {
+              r = self.w.write_u8(chr);
+              if r.is_ok() {
+                self.w.write_str(&indent_str)
+              } else {
+                r
+              }
+            },
+            &chr => {
+              self.w.write_u8(chr)
+            }
+          };
+
+          if r.is_err() {
+            break;
+          }
+        }
+
+        r
+      },
+    }
+  }
+}
+
 pub enum SafeWriting<'a> {
   Safe(&'a mut (SafeWriter +'a)),
   Unsafe(&'a mut (Writer +'a)),
@@ -327,7 +374,7 @@ impl <'a> HelperOptions<'a> {
 
   fn render_template(&self, template: Option<&'a Template>, data: &'a HBData, out: &mut SafeWriting) -> HBEvalResult {
     match template {
-      Some(t) => eval_with_globals(t, data, out, self.hb_context, self.global_data, self.context_stack),
+      Some(t) => eval_with_globals(t, data, out, self.hb_context, self.global_data, self.context_stack, None),
       None => Ok(()),
     }
 
@@ -393,7 +440,7 @@ impl <'a> HelperOptions<'a> {
     }
 
     match self.block {
-      Some(t) => eval_with_globals(t, data, out, self.hb_context, &h, self.context_stack),
+      Some(t) => eval_with_globals(t, data, out, self.hb_context, &h, self.context_stack, None),
       None    => Ok(()),
     }
   }
@@ -553,35 +600,44 @@ pub fn eval(template: &Template, data: &HBData, out: &mut Writer, eval_context: 
   let mut html_safe = HTMLSafeWriter::new(out);
   let mut safe_writer = SafeWriting::Safe(&mut html_safe);
 
-  eval_with_globals(template, data, &mut safe_writer, eval_context, &globals, &vec![data])
+  eval_with_globals(template, data, &mut safe_writer, eval_context, &globals, &vec![data], None)
 }
 
-pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a HBData, out: &mut SafeWriting, eval_context: &'a EvalContext, global_data: &HashMap<&str, &'c HBData>, context_stack: &Vec<&'b HBData>) -> HBEvalResult {
+pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a HBData, out: &mut SafeWriting, eval_context: &'a EvalContext, global_data: &HashMap<&str, &'c HBData>, context_stack: &Vec<&'b HBData>, indent: Option<String>) -> HBEvalResult {
   let mut stack:Vec<_> = template.iter().rev().map(|e| {
-    (e, data, context_stack.iter().map(|s| *s).collect::<Vec<_>>())
+    (e, data, context_stack.iter().map(|s| *s).collect::<Vec<_>>(), indent.clone())
   }).collect();
 
   while stack.len() > 0 {
-    let w_ok = if let Some((templ, ctxt, ctxt_stack)) = stack.pop() {
+    let w_ok = if let Some((ref templ, ref ctxt, ref ctxt_stack, ref indent)) = stack.pop() {
       match templ {
-        &box HBEntry::Raw(ref s) => {
-          out.into_unsafe().write_str(s.as_slice())
+        &&box HBEntry::Raw(ref s) => {
+          IndentWriter::with_indent(indent.clone(), &mut out.into_unsafe(), &|w| {
+            w.write_str(&s)
+          })
         },
-        &box HBEntry::Partial(ref exp) => {
+        &&box HBEntry::Partial(ref exp) => {
           match exp.base.as_slice() {
             [ref single] => {
               match eval_context.partial_with_name(single.as_slice()) {
                 Some(t) => {
                   let c_ctxt = if let Some(&HBValHolder::Path(ref p)) = exp.params.get(0) {
-                    value_for_key_path_in_context(ctxt, p, &ctxt_stack, global_data, eval_context.compat).unwrap_or(ctxt)
+                    value_for_key_path_in_context(*ctxt, p, &ctxt_stack, global_data, eval_context.compat).unwrap_or(*ctxt)
                   } else {
-                    ctxt
+                    *ctxt
                   };
 
                   for e in t.iter().rev() {
                     let mut c_stack = ctxt_stack.clone();
-                    c_stack.push(ctxt);
-                    stack.push((e, c_ctxt, c_stack));
+                    c_stack.push(*ctxt);
+                    // calculate indentation content
+                    let may_indent = match (indent, &exp.render_options.indent) {
+                      (&None, ref i @ &Some(_)) | (ref i @ &Some(_), &None) => (*i).clone(),
+                      (&Some(ref i), &Some(ref j)) => Some(format!("{}{}", i, j)),
+                      (&None, &None) => None,
+                    };
+
+                    stack.push((e, c_ctxt, c_stack, may_indent));
                   }
                   Ok(())
                 },
@@ -593,23 +649,31 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
           }
         },
 
-        &box HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref render_options, block: None, else_block: None}) => {
+        &&box HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref render_options, block: None, else_block: None}) => {
           match base.as_slice() {
             [ref single] if eval_context.has_helper_with_name(single.as_slice()) => {
               let helper = eval_context.helper_with_name(single.as_slice()).unwrap();
               if render_options.escape {
-                helper.call_fn(ctxt, params.as_slice(), options.as_slice(), out, eval_context, &ctxt_stack, global_data)
+                IndentWriter::with_indent(indent.clone(), out, &|w| {
+                  helper.call_fn(*ctxt, params.as_slice(), options.as_slice(), w, eval_context, &ctxt_stack, global_data)
+                })
               } else {
-                helper.call_fn(ctxt, params.as_slice(), options.as_slice(), &mut out.into_unsafe(), eval_context, &ctxt_stack, global_data)
+                IndentWriter::with_indent(indent.clone(), &mut out.into_unsafe(), &|w| {
+                  helper.call_fn(*ctxt, params.as_slice(), options.as_slice(), w, eval_context, &ctxt_stack, global_data)
+                })
               }
             },
-            _ => match value_for_key_path_in_context(ctxt, base, &ctxt_stack, global_data, eval_context.compat) {
+            _ => match value_for_key_path_in_context(*ctxt, base, &ctxt_stack, global_data, eval_context.compat) {
               Some(v) => match v.typed_node() {
                 HBNodeType::Leaf(_) => {
                   if render_options.escape {
-                    v.write_value(out)
+                    IndentWriter::with_indent(indent.clone(), out, &|w| {
+                      v.write_value(w)
+                    })
                   } else {
-                    v.write_value(&mut out.into_unsafe())
+                    IndentWriter::with_indent(indent.clone(), &mut out.into_unsafe(), &|w| {
+                      v.write_value(w)
+                    })
                   }
                 },
                 _ => Ok(()),
@@ -619,7 +683,7 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
           }
         },
 
-        &box HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref render_options, ref block, ref else_block}) => {
+        &&box HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref render_options, ref block, ref else_block}) => {
           render_options.escape; // only suppress unused warning
           match base.as_slice() {
             [ref single] if eval_context.has_helper_with_name(single.as_slice()) => {
@@ -634,7 +698,7 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
                 helper.call_for_block(
                   opt_block,
                   opt_else_block,
-                  ctxt,
+                  *ctxt,
                   params.as_slice(),
                   options.as_slice(),
                   out,
@@ -647,7 +711,7 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
               }
             },
             _ => {
-              let c_ctxt = value_for_key_path_in_context(ctxt, base, &ctxt_stack, global_data, eval_context.compat);
+              let c_ctxt = value_for_key_path_in_context(*ctxt, base, &ctxt_stack, global_data, eval_context.compat);
 
               match (c_ctxt.unwrap_or(&eval_context.falsy), block) {
                 (c, &Some(ref block_found)) => {
@@ -656,8 +720,8 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
                       if c.as_bool() && !render_options.inverse || !c.as_bool() && render_options.inverse {
                         for e in block_found.iter().rev() {
                           let mut c_stack = ctxt_stack.clone();
-                          c_stack.push(ctxt);
-                          stack.push((e, c, c_stack));
+                          c_stack.push(*ctxt);
+                          stack.push((e, c, c_stack, indent.clone()));
                         }
                       }
                     },
@@ -675,8 +739,8 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
                       for array_i in collection.iter().rev() {
                         for e in block_found.iter().rev() {
                           let mut c_stack = ctxt_stack.clone();
-                          c_stack.push(ctxt);
-                          stack.push((e, *array_i, c_stack));
+                          c_stack.push(*ctxt);
+                          stack.push((e, *array_i, c_stack, indent.clone()));
                         }
                       }
                     },
