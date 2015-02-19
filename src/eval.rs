@@ -61,7 +61,7 @@ fn value_for_key_path_in_context<'a>(
                 None => (),
               }
             }
-            return found
+            found
           },
           (_, v) => v,
         }
