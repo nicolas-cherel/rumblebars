@@ -42,6 +42,7 @@ rustlex! HandleBarsLexer {
     let IGN_WP        = [' ''\t''\r']*;
     let ALL_WP        = (NEW_LINE | IGN_WP)*;
     let PASS_THROUGH  = ALL_WP* ('{'?[^'{'' ''\t''\r''\n''\\'])*;
+    let PASS_ESC      = '\\';
     let ESCAPED_EXP   = '\\' '{';
     let ESCAPED_ESC   = '\\' '\\';
     let ESCAPED_SKIP  = '\\' '\\'? [^'{''\\''\r''\n'];
@@ -69,6 +70,7 @@ rustlex! HandleBarsLexer {
 
     COMMENT_EXP       => |lexer:&mut HandleBarsLexer<R>| Some( TokCommentExp(    lexer.yystr() ) )
 
+    PASS_ESC          => |lexer:&mut HandleBarsLexer<R>| Some( TokRaw( lexer.yystr()    ) )
     ESCAPED_EXP       => |_|                             Some( TokRaw( "{".to_string()  ) )
     ESCAPED_ESC       => |_|                             Some( TokRaw( "\\".to_string() ) )
     ESCAPED_SKIP      => |lexer:&mut HandleBarsLexer<R>| Some( TokRaw( lexer.yystr()    ) )
