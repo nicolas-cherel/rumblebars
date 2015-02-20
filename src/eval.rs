@@ -756,13 +756,21 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
                         None if inverse =>  vec![&eval_context.falsy],
                         None => vec![],
                       };
-                      for array_i in collection.iter().rev() {
-                        for e in block_found.iter().rev() {
-                          let mut c_stack = ctxt_stack.clone();
-                          c_stack.push(*ctxt);
-                          stack.push((e, *array_i, c_stack, indent.clone()));
+
+                      if ! collection.is_empty() {
+                        for array_i in collection.iter().rev() {
+                          for e in block_found.iter().rev() {
+                            let mut c_stack = ctxt_stack.clone();
+                            c_stack.push(*ctxt);
+                            stack.push((e, *array_i, c_stack, indent.clone()));
+                          }
+                        }
+                      } else if let &Some(ref inv_block) = else_block {
+                        for e in inv_block.iter().rev() {
+                          stack.push((e, *ctxt, ctxt_stack.clone(), indent.clone()));
                         }
                       }
+
                     },
                   }
                 },
