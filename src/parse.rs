@@ -4,6 +4,7 @@ use std::old_io::BufReader;
 use self::Token::{TokSimpleExp, TokNoEscapeExp, TokCommentExp, TokBlockExp, TokBlockElseCond, TokBlockEndExp, TokPartialExp, TokRaw};
 use self::HBToken::{TokPathEntry,TokNoWhiteSpaceBefore, TokNoWhiteSpaceAfter,TokStringParam,TokParamStart, TokParamSep, TokOption, TokLeadingWhiteSpace, TokTrailingWhiteSpace};
 
+#[derive(Debug)]
 enum Token {
   // base template tokens
   TokSimpleExp(String),
@@ -16,6 +17,7 @@ enum Token {
   TokRaw(String),
 }
 
+#[derive(Debug)]
 enum HBToken {
   TokPathEntry(String),
   TokNoWhiteSpaceBefore,
@@ -272,6 +274,7 @@ pub type Template = Vec<Box<HBEntry>>;
 
 pub enum ParseError {
   UnkownError, // unknown as ‘still not diagnosed’ case, not ’your grandma's TV is set on fire’ case
+  InvalidExpression,
   UnmatchedBlock,
   UnexpectedBlockClose,
 }
@@ -433,14 +436,14 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
         if let Ok((lead_wp, hb, trail_wp)) = parse_hb_expression(exp.as_slice()) {
           Unit::Append(lead_wp, box HBEntry::Eval(hb), trail_wp)
         } else {
-          Unit::Skip
+          return Result::Err((ParseError::InvalidExpression, Some(format!("Could not parse {:?}", exp))));
         }
       },
       TokCommentExp(ref exp) => {
         if let Ok((lead_wp, hb, trail_wp)) = parse_hb_expression(exp.as_slice()) {
           Unit::TrimOnly(lead_wp, box HBEntry::Eval(hb), trail_wp)
         } else {
-          Unit::Skip
+          return Result::Err((ParseError::InvalidExpression, Some(format!("Could not parse {:?}", exp))));
         }
       },
       TokNoEscapeExp(ref exp) => {
@@ -448,14 +451,14 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
           hb.render_options.escape = false;
           Unit::Append(lead_wp, box HBEntry::Eval(hb), trail_wp)
         } else {
-          Unit::Skip
+          return Result::Err((ParseError::InvalidExpression, Some(format!("Could not parse {:?}", exp))));
         }
       },
       TokPartialExp(ref exp) => {
         if let Ok((lead_wp, hb, trail_wp)) = parse_hb_expression(exp.as_slice()) {
           Unit::AppendAutoTrim(lead_wp, box HBEntry::Partial(hb), trail_wp)
         } else {
-          Unit::Skip
+          return Result::Err((ParseError::InvalidExpression, Some(format!("Could not parse {:?}", exp))));
         }
       },
       TokBlockExp(ref exp, inverse) => {
@@ -463,21 +466,21 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
           hb.render_options.inverse = inverse;
           Unit::Shift(lead_wp, box HBEntry::Eval(hb), false, trail_wp)
         } else {
-          Unit::Skip
+          return Result::Err((ParseError::InvalidExpression, Some(format!("Could not parse {:?}", exp))));
         }
       },
       TokBlockElseCond(ref exp) => {
         if let Ok((lead_wp, hb, trail_wp)) = parse_hb_expression(exp.as_slice()) {
           Unit::Shift(lead_wp, box HBEntry::Eval(hb), true, trail_wp)
         } else {
-          Unit::Skip
+          return Result::Err((ParseError::InvalidExpression, Some(format!("Could not parse {:?}", exp))));
         }
       },
       TokBlockEndExp(ref exp) => {
         if let Ok((lead_wp, hb, trail_wp)) = parse_hb_expression(exp.as_slice()) {
           Unit::Reduce(lead_wp, box HBEntry::Eval(hb), trail_wp)
         } else {
-          Unit::Skip
+          return Result::Err((ParseError::InvalidExpression, Some(format!("Could not parse {:?}", exp))));
         }
       }
     };
