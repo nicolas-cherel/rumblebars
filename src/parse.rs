@@ -49,7 +49,7 @@ rustlex! HandleBarsLexer {
     let NO_ESC_EXP    = ALL_WP OPEN ('{' EXP '}' | '&' EXP) CLOSE ALL_WP;
     let PARTIAL_EXP   = ALL_WP OPEN '>' EXP CLOSE ALL_WP;
     let SIMPLE_EXP    = ALL_WP OPEN [^'!'] EXP CLOSE ALL_WP;
-    let ELSE_EXP      = ALL_WP OPEN ("else" | '^') CLOSE ALL_WP;
+    let ELSE_EXP      = ALL_WP OPEN (IGN_WP "else" IGN_WP | '^') CLOSE ALL_WP;
 
     let COMMENT_EXP   = ALL_WP OPEN '!' EXP CLOSE ALL_WP;
 
