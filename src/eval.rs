@@ -487,6 +487,8 @@ impl Helper {
       match v {
         &HBValHolder::String(ref s) => s as &HBData,
         &HBValHolder::Path(ref p) => value_for_key_path_in_context(context, p, ctxt_stack, global_data, false).unwrap_or(&hb_context.falsy),
+        &HBValHolder::Literal(ref d, ref s) => value_for_key_path_in_context(context, &vec![s.clone()], ctxt_stack, global_data, false)
+          .unwrap_or(d as &HBData)
       }
     }).collect::<Vec<_>>()
   }
@@ -511,7 +513,9 @@ impl Helper {
           v.as_bool()
         } else {
           false
-        }
+        },
+        &HBValHolder::Literal(ref d, ref s) => value_for_key_path_in_context(context, &vec![s.clone()], ctxt_stack, global_data, false)
+          .unwrap_or(d as &HBData).as_bool()
       },
       _ => false
     };

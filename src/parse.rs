@@ -1,5 +1,6 @@
 
 use std::old_io::BufReader;
+use serialize::json::Json;
 
 use self::Token::{TokSimpleExp, TokNoEscapeExp, TokCommentExp, TokBlockExp, TokBlockElseCond, TokBlockEndExp, TokPartialExp, TokRaw};
 use self::HBToken::{TokPathEntry,TokNoWhiteSpaceBefore, TokNoWhiteSpaceAfter,TokStringParam,TokParamStart, TokParamSep, TokOption, TokLeadingWhiteSpace, TokTrailingWhiteSpace};
@@ -222,6 +223,7 @@ rustlex! HBExpressionLexer {
 pub enum HBValHolder {
   String(String),
   Path(Vec<String>),
+  Literal(Json, String),
 }
 
 #[derive(Debug)]
@@ -352,7 +354,20 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpressionParsing, (ParseError, Op
             _ => { break; }
           }
         }
-        if param_path.len() > 0 {
+        let literal_param = match param_path.as_slice() {
+          [ref s] => {
+            if let Ok(j) = Json::from_str(s) {
+              Some(HBValHolder::Literal(j, s.clone()))
+            } else {
+              None
+            }
+          },
+          _ => None,
+        };
+
+        if let Some(p) = literal_param {
+          params.push(p);
+        } else if param_path.len() > 0 {
           params.push(HBValHolder::Path(param_path));
         }
       },
