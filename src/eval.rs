@@ -681,7 +681,7 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
             },
             _ => match value_for_key_path_in_context(*ctxt, base, &ctxt_stack, global_data, eval_context.compat) {
               Some(v) => match v.typed_node() {
-                HBNodeType::Leaf(_) => {
+                HBNodeType::Leaf(_) | HBNodeType::Array(_)=> {
                   if render_options.escape {
                     IndentWriter::with_indent(indent.clone(), out, &|w| {
                       v.write_value(w)
