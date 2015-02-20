@@ -95,7 +95,7 @@ mod handlebars {
   }
 
   // static list of handlebars tests known to fail
-  static UNSUPPORTED_HANDLEBARS_FEATURES_CASES: [&'static str; 7] = [
+  static UNSUPPORTED_HANDLEBARS_FEATURES_CASES: [&'static str; 8] = [
     "{\"template\":\"{{foo}}\",\"data\":{\"bar_foo\":\"food\"},\"expected\":\"food\"}", // js version depends on custom lookup
     "{\"template\":\"Awesome\\\\\",\"data\":{},\"expected\":\"Awesome\\\\\",\"message\":\"text is escaped so that the closing quote can't be ignored\"}", // some escaping problem on test extraction
     "{\"template\":\"{{#each goodbyes}}{{text}}! {{/each}}cruel {{world}}!\",\"expected\":\"cruel !\",\"options\":{\"data\":true,\"blockParams\":[],\"knownHelpers\":{\"helperMissing\":true,\"blockHelperMissing\":true,\"each\":true,\"if\":true,\"unless\":true,\"with\":true,\"log\":true,\"lookup\":true}}}", // goodbyes is a function in there
@@ -103,6 +103,7 @@ mod handlebars {
     "{\"template\":\"{{foo}} \",\"data\":{\"foo\":\"food\"},\"expected\":\"foo_food \"}", // unsupported (custom lookup ?) stuff
     "{\"template\":\"{{foo}}\",\"data\":{\"foo\":\"food\"},\"expected\":\"food_foo\"}",
     "{\"template\":\"{{> dude}}\",\"data\":{},\"partials\":{\"dude\":\"fail\"},\"expected\":\"\",\"options\":{\"data\":true,\"blockParams\":[],\"knownHelpers\":{\"helperMissing\":true,\"blockHelperMissing\":true,\"each\":true,\"if\":true,\"unless\":true,\"with\":true,\"log\":true,\"lookup\":true}}}", // supposed to fail
+    "{\"template\":\"{{#if goodbye includeZero=true}}GOODBYE {{/if}}cruel {{world}}!\",\"data\":{\"goodbye\":0,\"world\":\"world\"},\"expected\":\"GOODBYE cruel world!\",\"message\":\"if with zero does not show the contents\"}", // includeZero? seriously ?
   ];
 
   macro_rules! hbtest{
