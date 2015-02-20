@@ -590,6 +590,10 @@ impl Default for EvalContext {
 }
 
 impl EvalContext {
+  pub fn partials(&self) -> &HashMap<String, Template> {
+    return &self.partials;
+  }
+
   pub fn register_partial(&mut self, name: String, t: Template) {
     self.partials.insert(name, t);
   }

@@ -302,6 +302,7 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpressionParsing, (ParseError, Op
   while let Some(tok) = lexer.next() {
     match tok {
       TokLeadingWhiteSpace(s) => {
+        println!("s whitespace  to match {:?}", s);
         let indent_space_matcher = regex!("([:blank:]*)$");
         render_options.indent = indent_space_matcher.captures(&s).and_then(|s| s.at(1) ).map(|s| s.to_string());
         leading_whitespace = Some(s);
@@ -428,8 +429,14 @@ fn append_entry(stack: &mut Vec<(Box<Template>, bool)>, e: Box<HBEntry>) {
 pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
   // trimming template handling with a regex, rustlex does not emit tokens on input end,
   // but it's very (very) convenient for this case
-  let end_wp_trimmer = regex!("(\r?\n)[:blank:]*(\\{\\{[#!/](?:\\}?[^}])*\\}\\})[:blank:]*(:?\r?\n)?\\z");
+
+  // general case,
+  let end_wp_trimmer = regex!("(\r?\n)[:blank:]*(\\{\\{~?[#!/](?:\\}?[^}])*\\}\\})[:blank:]*(:?\r?\n)?\\z");
+  // partial case
+  let partial_end_wp_trimmer = regex!("(\r?\n[:blank:]*)(\\{\\{~?>(?:\\}?[^}])*\\}\\})[:blank:]*(:?\r?\n)?\\z");
   let trimmed = end_wp_trimmer.replace_all(&template,"$1$2");
+  let trimmed = partial_end_wp_trimmer.replace_all(&trimmed,"$1$2");
+  println!("timmed {:?}", trimmed);
 
   let lexer = HandleBarsLexer::new(BufReader::new(trimmed.as_bytes()));
 
@@ -500,11 +507,12 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
       }
     };
 
+
     match token_result {
       // direct append without trimming
       Unit::Append(None, entry, None) => {
         previous_trail_whitespace = None;
-        append_entry(&mut stack, entry)
+        append_entry(&mut stack, entry);
       },
       // direct append with explicit trimming
       Unit::Append(lead_wp, entry, trail_wp) => {
@@ -548,6 +556,7 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
         // extract whitespace options
         let (remove_lead_wp, remove_trail_wp) = match entry {
           box HBEntry::Eval(ref exp) => (exp.render_options.no_leading_whitespace, exp.render_options.no_trailing_whitespace),
+          box HBEntry::Partial(ref exp) => (exp.render_options.no_leading_whitespace, exp.render_options.no_trailing_whitespace),
           _ => (false, false),
         };
 
@@ -606,7 +615,12 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
         };
 
         // keep elligible trailing whitespace for next expression auto trimming check
-        previous_trail_whitespace = trail_keep.clone().and_then(|k| {if k == "" { None } else { Some(k) }} ).or(trail_match.clone());
+        previous_trail_whitespace = if !remove_trail_wp {
+          trail_keep.clone().and_then(|k| {if k == "" { None } else { Some(k) }} ).or(trail_match.clone())
+        } else {
+          None
+        };
+
 
         // if there is not autotrim nor explicit trimming, push leading whitespace
         if let (false, false, Some(space)) = (trimmed, remove_lead_wp, lead_wp) {
@@ -616,7 +630,7 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
 
         if shift || append {
           // first, just handle partial trimming specific handling for indentation
-          if trimmed /*&& first*/ && entry.is_partial() {
+          if trimmed && entry.is_partial() {
             match entry {
               box HBEntry::Partial(HBExpression {render_options: RenderOptions {indent: Some(ref s), ..}, ..}) => append_entry(&mut stack, box HBEntry::Raw(s.clone())),
               _ => ()
