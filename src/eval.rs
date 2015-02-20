@@ -173,40 +173,27 @@ impl <'a> HTMLSafeWriter<'a> {
 
 impl <'a> Writer for HTMLSafeWriter<'a> {
   fn write_all(&mut self, buf: &[u8]) -> Result<(), IoError> {
-    let lt = "<".as_bytes()[0];
-    let gt = ">".as_bytes()[0];
-    let amp = "&".as_bytes()[0];
-    let quot = "\"".as_bytes()[0];
-
-    let esc_lt = "&lt;".as_bytes();
-    let esc_gt = "&gt;".as_bytes();
-    let esc_amp = "&amp;".as_bytes();
-    let esc_quot = "&quot;".as_bytes();
-
-
     let mut r = Ok(());
+    if let Ok(_str) = ::std::str::from_utf8(buf) {
+      let writer = self.writer();
+      for c in _str.chars() {
+        r = match c {
+          '<'  => writer.write_str("&lt;"),
+          '>'  => writer.write_str("&gt;"),
+          '&'  => writer.write_str("&amp;"),
+          '"'  => writer.write_str("&quot;"),
+          '\'' => writer.write_str("&#x27;"),
+          '`'  => writer.write_str("&#x60;"),
+          '\\' => writer.write_str("\\"),
 
-    for c in buf.iter() {
-      r = match c {
-        chr if *chr == lt => {
-          self.writer().write_all(esc_lt)
-        },
-        chr if *chr == gt => {
-          self.writer().write_all(esc_gt)
-        },
-        chr if *chr == amp => {
-          self.writer().write_all(esc_amp)
-        },
-        chr if *chr == quot => {
-          self.writer().write_all(esc_quot)
-        },
-        chr => {
-          self.writer().write_u8(*chr)
+          chr => {
+            writer.write_char(chr)
+          }
+        };
+
+        if r.is_err() {
+          break;
         }
-      };
-
-      if r.is_err() {
-        break;
       }
     }
 
