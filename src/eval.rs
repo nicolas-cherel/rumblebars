@@ -38,12 +38,13 @@ fn value_for_key_path_in_context<'a>(
         continue;
       },
       _ if key.starts_with("@") => {
-        ctxt = match global_data.get(key.as_slice()) {
-          Some(&val) => Some(val),
-          None => ctxt,
+        match global_data.get(key.as_slice()) {
+          Some(&val) => {
+            ctxt = Some(val);
+            continue;
+          },
+          None => (),
         };
-
-        continue;
       },
       _ => (),
     }
