@@ -310,7 +310,7 @@ impl HBData for Json {
       &Json::Boolean(ref b) => *b,
       &Json::Null           => false,
       &Json::Array(ref a)   => !a.is_empty(),
-      _  => true,
+      &Json::Object(_)      => true,
     }
   }
 
