@@ -249,6 +249,22 @@ impl HBData for Json {
       &Json::F64(ref f)     => write!(out, "{}", f),
       &Json::String(ref s)  => write!(out, "{}", s),
       &Json::Boolean(ref b) => write!(out, "{}", b),
+      &Json::Array(ref a)   => {
+        let mut err:HBEvalResult = Ok(());
+
+        for (index, e) in a.iter().enumerate() {
+          err = err.and(e.write_value(out));
+
+          if index < (a.len() - 1) && err.is_ok() {
+            err = err.and(write!(out, ","))
+          };
+
+          if err.is_err() {
+            break;
+          }
+        }
+        err
+      }
       _  => Ok(()),
     }
   }
