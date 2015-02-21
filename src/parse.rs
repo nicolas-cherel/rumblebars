@@ -115,6 +115,8 @@ rustlex! HBExpressionLexer {
   let OPTION_NAME      = IDENTIFIER "=";
 
   INITIAL {
+    NO_WP       => |lexer:&mut HBExpressionLexer<R>| { lexer.FORCE_END(); Some( TokNoWhiteSpaceAfter ) }
+
     START       => |lexer:&mut HBExpressionLexer<R>| { lexer.ACCESSOR(); None }
     START_NO_WP => |lexer:&mut HBExpressionLexer<R>| { lexer.ACCESSOR(); Some(TokNoWhiteSpaceBefore) }
     ALL_WP      => |lexer:&mut HBExpressionLexer<R>| { Some( TokLeadingWhiteSpace( lexer.yystr() ) ) }
@@ -134,6 +136,8 @@ rustlex! HBExpressionLexer {
     THIS         => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( ".".to_string()  ) ) }
     PARENT_ALIAS => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( "..".to_string() ) ) }
 
+    NO_WP       => |lexer:&mut HBExpressionLexer<R>| { lexer.FORCE_END(); Some( TokNoWhiteSpaceAfter ) }
+    END         => |lexer:&mut HBExpressionLexer<R>| { lexer.TRAILING_WP(); None }
   }
 
   PROPERTY_PATH {
@@ -314,6 +318,7 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpressionParsing, (ParseError, Op
       TokNoWhiteSpaceAfter     => { render_options.no_trailing_whitespace = true },
       TokTrailingWhiteSpace(s) => { trailing_whitespace = Some(s) },
       TokPathEntry(path_comp)  => { path.push(path_comp) },
+      TokStringParam(path_comp)  => { path.push(path_comp) },
 
       TokParamStart => {
         let mut param_path = vec![];
