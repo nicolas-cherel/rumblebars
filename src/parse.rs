@@ -308,7 +308,6 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpressionParsing, (ParseError, Op
   while let Some(tok) = lexer.next() {
     match tok {
       TokLeadingWhiteSpace(s) => {
-        println!("s whitespace  to match {:?}", s);
         let indent_space_matcher = regex!("([:blank:]*)$");
         render_options.indent = indent_space_matcher.captures(&s).and_then(|s| s.at(1) ).map(|s| s.to_string());
         leading_whitespace = Some(s);
@@ -401,12 +400,12 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpressionParsing, (ParseError, Op
 // after handling parsed token, handle result and leading/trailing whitespace
 #[derive(Debug)]
 enum Unit {
+  AppendRaw(Box<HBEntry>),
   Append(Option<String>, Box<HBEntry>, Option<String>),
   AppendAutoTrim(Option<String>, Box<HBEntry>, Option<String>),
   Shift(Option<String>,  Box<HBEntry>, bool, Option<String>),
   Reduce(Option<String>, Box<HBEntry>, Option<String>),
   TrimOnly(Option<String>, Box<HBEntry>, Option<String>),
-  Skip,
 }
 
 // append entry to stack but if entry is raw data, append it to last raw entry
@@ -443,7 +442,6 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
   let partial_end_wp_trimmer = regex!("(\r?\n[:blank:]*)(\\{\\{~?>(?:\\}?[^}])*\\}\\})[:blank:]*(:?\r?\n)?\\z");
   let trimmed = end_wp_trimmer.replace_all(&template,"$1$2");
   let trimmed = partial_end_wp_trimmer.replace_all(&trimmed,"$1$2");
-  println!("timmed {:?}", trimmed);
 
   let lexer = HandleBarsLexer::new(BufReader::new(trimmed.as_bytes()));
 
@@ -452,14 +450,15 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
 
   let trim_lead_space_matcher = regex!("((?:[:blank:]|\r?\n)*)(\r?\n)[:blank:]*$");
   let trim_trail_space_matcher = regex!("^([:blank:]*\r?\n)(.*)");
-  let mut previous_trail_whitespace = None;
+
+  let mut previous_trail_whitespace: Option<(String, bool)> = None;
   let mut first = true;
 
   for tok in lexer {
     // handle each token specifities and distribute them to generic shift/reduce handlings
     let token_result = match tok {
       TokRaw(s) => {
-        Unit::Append(None, box HBEntry::Raw(s), None)
+        Unit::AppendRaw(box HBEntry::Raw(s))
       },
       TokSimpleExp(ref exp) => {
         if let Ok((lead_wp, hb, trail_wp)) = parse_hb_expression(exp.as_slice()) {
@@ -514,10 +513,14 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
       }
     };
 
-
     match token_result {
       // direct append without trimming
-      Unit::Append(None, entry, None) => {
+      Unit::AppendRaw(entry) => {
+        match previous_trail_whitespace {
+          Some((s, true)) => append_entry(&mut stack, box HBEntry::Raw(s)),
+          _ => ()
+        };
+
         previous_trail_whitespace = None;
         append_entry(&mut stack, entry);
       },
@@ -529,23 +532,21 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
           _ => (false, false),
         };
 
+        // if we have previous trail, it's our current leading, so skip if we trim lead
+        match (previous_trail_whitespace, remove_lead_wp) {
+          (Some((s, true)), false) => append_entry(&mut stack, box HBEntry::Raw(s)),
+          _ => ()
+        };
+
+        previous_trail_whitespace = trail_wp.map(|s| (s, !remove_trail_wp) );
+
         match (lead_wp, remove_lead_wp) {
           (Some(space), false) => append_entry(&mut stack, box HBEntry::Raw(space)),
           _ => ()
         }
 
-        if ! remove_trail_wp {
-          previous_trail_whitespace = trail_wp.clone();
-        }
-
         append_entry(&mut stack, entry);
 
-        match (trail_wp, remove_trail_wp) {
-          (Some(space), false) => {
-            append_entry(&mut stack, box HBEntry::Raw(space))
-          },
-          _ => ()
-        };
       },
       // shift or reduce with auto trim
       autotrimable @ Unit::Shift(..) |
@@ -576,7 +577,7 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
         // or fallback to a default
         let lead_space_with_fallbacks = lead_wp.clone()
           .map(|wp| (wp, true))
-          .or(previous_trail_whitespace.clone().map(|wp| (wp, false)))
+          .or(previous_trail_whitespace.clone().map(|(wp, can_be_used)| (wp, can_be_used)))
           .or(Some(("".to_string(), false)));
 
         let (trimmed, trail_match, trail_keep) = match (lead_space_with_fallbacks, trail_wp.clone()) {
@@ -615,25 +616,22 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
 
                 (true, trail_m, trail_k)
               }
-              _ => (false, None, None),
+              _ => (false, None, trail_wp),
             }
           },
-          _ => (false, None, None),
-        };
-
-        // keep elligible trailing whitespace for next expression auto trimming check
-        previous_trail_whitespace = if !remove_trail_wp {
-          trail_keep.clone().and_then(|k| {if k == "" { None } else { Some(k) }} ).or(trail_match.clone())
-        } else {
-          None
+          _ => (false, None, trail_wp),
         };
 
 
-        // if there is not autotrim nor explicit trimming, push leading whitespace
-        if let (false, false, Some(space)) = (trimmed, remove_lead_wp, lead_wp) {
+        // if there is not autotrim nor explicit trimming, push leading whitespace, that might come from previous trailing
+        let usable_previous = previous_trail_whitespace.and_then(|(s, can_use)| if can_use { Some(s) } else { None });
+
+        if let (false, false, Some(space)) = (trimmed, remove_lead_wp, lead_wp.or(usable_previous)) {
           append_entry(&mut stack, box HBEntry::Raw(space));
         }
 
+        // keep elligible trailing whitespace for next expression auto trimming check
+        previous_trail_whitespace = trail_keep.clone().and_then(|k| {if k == "" { None } else { Some((k, !remove_trail_wp)) }} ).or(trail_match.clone().map(|s| (s, false)));
 
         if shift || append {
           // first, just handle partial trimming specific handling for indentation
@@ -645,7 +643,9 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
           }
 
           // append, push entry into current collector
-          append_entry(&mut stack, entry);
+          if ! is_else {
+            append_entry(&mut stack, entry);
+          }
 
           if shift {
             // compilation shifting : entry was pushed, and a new collector is inserted
@@ -697,26 +697,19 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
           }
 
         }
-
-        // insert trailing whitespace if not explicitly trimmed
-        match (trail_keep.or(trail_wp), remove_trail_wp) {
-          (Some(space), false) => {
-            if space.len() > 0 {
-              append_entry(&mut stack, box HBEntry::Raw(space))
-            }
-          },
-          _ => ()
-        }
-
-      },
-      Unit::Skip => {
-        previous_trail_whitespace = None;
       },
     }
 
     // not first token anymore
     first = false;
   }
+
+  match previous_trail_whitespace {
+    Some((ref s, true)) =>  {
+      append_entry(&mut stack, box HBEntry::Raw(s.clone()))
+    },
+    _ => ()
+  };
 
   if stack.len() > 0 {
     Result::Ok(*stack.remove(0).0)
