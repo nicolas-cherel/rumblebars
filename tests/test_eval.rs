@@ -2,18 +2,22 @@
 extern crate rumblebars;
 extern crate "rustc-serialize" as serialize;
 
+
+
 mod eval {
+  mod trimming;
+
   use serialize::json::Json;
   use std::default::Default;
   use std::collections::HashMap;
 
   use rumblebars::eval;
+  use rumblebars::parse;
   use rumblebars::EvalContext;
   use rumblebars::Helper;
   use rumblebars::HelperOptions;
   use rumblebars::HBData;
   use rumblebars::HBEvalResult;
-  use rumblebars::parse;
   use rumblebars::SafeWriting;
 
   #[test]
@@ -430,7 +434,7 @@ mod eval {
 
       eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
-      let expected = "\n        2)\n          o\n          \n\n          \n          uU\n\n      "; // one line string due to trailing whitespace
+      let expected = "\n        2)\n          o\n          \n\n          uU\n\n      "; // one line string due to trailing whitespace
       assert_eq!(String::from_utf8(buf).unwrap(), expected);
     }
   }
