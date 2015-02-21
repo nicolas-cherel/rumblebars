@@ -1,11 +1,4 @@
-#![feature(core)]
-#![feature(io)]
-#![feature(path)]
 
-extern crate rumblebars;
-extern crate "rustc-serialize" as serialize;
-
-mod mustache {
   use std::old_path::posix::Path;
   use std::old_path::GenericPath;
   use std::old_io::{fs, FileStat, FileType};
@@ -99,5 +92,5 @@ mod mustache {
   mustache_tests_set!(inverted);
   mustache_tests_set!(partials);
   mustache_tests_set!(sections);
-}
+
 

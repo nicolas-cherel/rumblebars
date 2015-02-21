@@ -1,9 +1,4 @@
 
-extern crate rumblebars;
-extern crate "rustc-serialize" as serialize;
-
-
-mod handlebars {
   use std::default::Default;
 
   use serialize::json::Json;
@@ -430,5 +425,3 @@ mod handlebars {
   hbtest!(test_270_hb, "{\"template\":\"{{#if foo~}} bar {{~^}} baz {{/if}}\",\"data\":{},\"expected\":\" baz \"}");
   hbtest!(test_271_hb, "{\"template\":\"{{#if foo~}} bar {{~else~}} baz {{~/if}}\",\"data\":{},\"expected\":\"baz\"}");
   hbtest!(test_272_hb, "{\"template\":\"\\n\\n{{~#if foo~}} \\n\\nbar \\n\\n{{~^~}} \\n\\nbaz \\n\\n{{~/if~}}\\n\\n\",\"data\":{},\"expected\":\"baz\"}");
-
-}

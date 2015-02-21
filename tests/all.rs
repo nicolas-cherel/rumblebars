@@ -2,10 +2,13 @@
 extern crate rumblebars;
 extern crate "rustc-serialize" as serialize;
 
-
+mod helpers;
+mod parse;
 
 mod eval {
   mod trimming;
+  mod handlebars;
+  mod mustache;
 
   use serialize::json::Json;
   use std::default::Default;
@@ -488,3 +491,4 @@ mod eval {
   }
 
 }
+

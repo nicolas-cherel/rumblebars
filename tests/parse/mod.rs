@@ -1,7 +1,5 @@
 extern crate rumblebars;
 
-mod parse {
-
   use rumblebars::parse;
   use rumblebars::ParseError;
 
@@ -46,4 +44,3 @@ mod parse {
   fn fail_nested_block() {
     assert!(match parse("{{#o}}{{/i}}{{/o}}") { Err((ParseError::UnmatchedBlock, _)) => true, Err(_) => false, Ok(_) => false })
   }
-}

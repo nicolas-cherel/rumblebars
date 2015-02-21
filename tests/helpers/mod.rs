@@ -1,8 +1,6 @@
 extern crate rumblebars;
 extern crate "rustc-serialize" as serialize;
 
-
-mod helper {
   use serialize::json::Json;
   use std::default::Default;
 
@@ -241,4 +239,3 @@ mod helper {
 
     assert_eq!(String::from_utf8(buf).unwrap(), "result");
   }
-}
