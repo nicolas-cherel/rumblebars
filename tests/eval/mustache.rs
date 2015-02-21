@@ -61,7 +61,7 @@ fn test_set(set_name: &str) {
               if !errors.is_empty() {
                 panic!(errors.iter().map(
                   |&(ref name, ref desc, ref result, ref expected)| format!("\nFAILED in {}: {} - {}\nresult:\n{:?}\nexpected:\n{:?}\n", set_name, name, desc, result, expected)
-                ).fold(String::new(), |mut s, v| { s.push_str(v.as_slice()); s }))
+                ).fold(String::new(), |mut s, v| { s.push_str(&v); s }))
               }
 
 
