@@ -331,6 +331,45 @@ impl HBData for String {
   fn keys(&self) -> Option<Vec<&str>> { None }
 }
 
+struct FallbackToOptions<'a> {
+  data: &'a (HBData + 'a),
+  options: HashMap<&'a str, &'a (HBData+'a)>,
+}
+
+impl <'a> HBData for FallbackToOptions<'a> {
+  fn write_value(&self, out: &mut SafeWriting) -> HBEvalResult {
+    self.data.write_value(out)
+  }
+
+  fn typed_node(&self) -> HBNodeType<&HBData> {
+    self.data.typed_node()
+  }
+
+  fn as_array(&self) -> Option<Vec<&HBData>> {
+    self.data.as_array()
+  }
+
+  fn get_key(&self, key: &str) -> Option<&HBData> {
+    match self.data.get_key(key) {
+      v @ Some(_) => v,
+      None => {
+        self.options.get(key).map(|&v| v)
+      }
+    }
+  }
+
+  fn as_bool(&self) -> bool {
+    self.data.as_bool()
+  }
+
+  fn keys(&self) -> Option<Vec<&str>> {
+    let mut res = vec![];
+    res.append(&mut self.data.keys().iter().map(|e| e.iter().map(|&e| e)).flat_map(|e| e).collect::<Vec<_>>());
+    res.append(&mut self.options.keys().map(|&e| e).collect::<Vec<_>>());
+    Some(res)
+  }
+}
+
 pub type HBHelperFunction = fn(params: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, hb_context: &EvalContext) -> HBEvalResult;
 
 #[derive(Copy)]
@@ -616,9 +655,23 @@ pub fn eval(template: &Template, data: &HBData, out: &mut Writer, eval_context: 
 }
 
 pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a HBData, out: &mut SafeWriting, eval_context: &'a EvalContext, global_data: &HashMap<&str, &'c HBData>, context_stack: &Vec<&'b HBData>, indent: Option<String>) -> HBEvalResult {
+
+  // evaluation is done by iterating through each HBEntry to evaluate
+  //  - raw copy,
+  //  - simple expression evaluation (render value execute helper call)
+  //  - partial evalutation, stacking each entry from registered partial)
+  //  - block evaluation, stacking each entry of block with parameterized context, with basic flow control (each, if)
+
+  // given the above, we start by stacking each entries of template root level
+  // each entry comes along with :
+  //  - a ref to their associated context
+  //  - a context stack, to have access of context of parent blocks (copied for each entry)
+  //  - an indentation level (for partials, copied for each entry)
   let mut stack:Vec<_> = template.iter().rev().map(|e| {
     (e, data, context_stack.iter().map(|s| *s).collect::<Vec<_>>(), indent.clone())
   }).collect();
+
+  let mut partial_options_contexts = vec![];
 
   while stack.len() > 0 {
     let w_ok = if let Some((ref templ, ref ctxt, ref ctxt_stack, ref indent)) = stack.pop() {
@@ -639,18 +692,42 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
                     *ctxt
                   };
 
+                  let with_options_fallback = if exp.options.len() > 0 {
+                    let mut options_contexts: HashMap<&str, &HBData> = HashMap::new();
+                    for o in exp.options.iter() {
+                      match o {
+                        &(ref name, HBValHolder::String(ref s)) => {
+                          options_contexts.insert(&name, s as &HBData);
+                        },
+                        &(ref name, HBValHolder::Path(ref p)) => {
+                          options_contexts.insert(&name, value_for_key_path_in_context(*ctxt, p, &ctxt_stack, global_data, eval_context.compat).unwrap_or(&eval_context.falsy));
+                        },
+                        &(ref name, HBValHolder::Literal(ref j, _)) => {
+                          options_contexts.insert(&name, j as &HBData);
+                        },
+                      }
+                    }
+
+                    // store data into a collections with enough lifetime, with need of a known safe transmute
+                    partial_options_contexts.push(FallbackToOptions { data: c_ctxt, options: options_contexts });
+                    unsafe { ::std::mem::transmute(partial_options_contexts.last().map(|f| f as &HBData)) }
+                  } else {
+                    None
+                  };
+
+                  // calculate indentation content
+                  let may_indent = match (indent, &exp.render_options.indent) {
+                    (&None, ref i @ &Some(_)) | (ref i @ &Some(_), &None) => (*i).clone(),
+                    (&Some(ref i), &Some(ref j)) => Some(format!("{}{}", i, j)),
+                    (&None, &None) => None,
+                  };
+
                   for e in t.iter().rev() {
                     let mut c_stack = ctxt_stack.clone();
                     c_stack.push(*ctxt);
-                    // calculate indentation content
-                    let may_indent = match (indent, &exp.render_options.indent) {
-                      (&None, ref i @ &Some(_)) | (ref i @ &Some(_), &None) => (*i).clone(),
-                      (&Some(ref i), &Some(ref j)) => Some(format!("{}{}", i, j)),
-                      (&None, &None) => None,
-                    };
-
-                    stack.push((e, c_ctxt, c_stack, may_indent));
+                    stack.push((e, with_options_fallback.unwrap_or(c_ctxt), c_stack, may_indent.clone()));
                   }
+
                   Ok(())
                 },
                 _ => Ok(())
@@ -700,12 +777,15 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
           match base.as_slice() {
             [ref single] if eval_context.has_helper_with_name(single.as_slice()) => {
               let helper = eval_context.helper_with_name(single.as_slice()).unwrap();
+
+              // collect options of deref'd blocks
               let blocks: Vec<_> = [block, else_block].iter().map(|b| {
                 match b {
                   &&Some(box ref t) => Some(t),
                   &&None => None,
                 }
               }).collect();
+
               if let [opt_block, opt_else_block] = blocks.as_slice() {
                 helper.call_for_block(
                   opt_block,

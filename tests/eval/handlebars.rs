@@ -84,7 +84,7 @@ fn test_handlebars(data: &str) {
 }
 
 // static list of handlebars tests known to fail
-static UNSUPPORTED_HANDLEBARS_FEATURES_CASES: [&'static str; 24] = [
+static UNSUPPORTED_HANDLEBARS_FEATURES_CASES: [&'static str; 23] = [
   // js version depends on custom lookup
   "{\"template\":\"{{foo}}\",\"data\":{\"bar_foo\":\"food\"},\"expected\":\"food\"}",
 
@@ -134,7 +134,7 @@ static UNSUPPORTED_HANDLEBARS_FEATURES_CASES: [&'static str; 24] = [
    "{\"template\":\"Dudes: {{> 404/asdf?.bar}}\",\"data\":{\"name\":\"Jeepers\",\"another_dude\":\"Creepers\"},\"partials\":{\"404/asdf?.bar\":\"{{name}}\"},\"expected\":\"Dudes: Jeepers\",\"message\":\"Partials can use literal paths\",\"options\":{\"data\":true,\"blockParams\":[],\"knownHelpers\":{\"helperMissing\":true,\"blockHelperMissing\":true,\"each\":true,\"if\":true,\"unless\":true,\"with\":true,\"log\":true,\"lookup\":true}}}",
 
    // TODO : https://github.com/nicolas-cherel/rumblebars/issues/1
-   "{\"template\":\"Dudes: {{#dudes}}{{> dude others=..}}{{/dudes}}\",\"data\":{\"foo\":\"bar\",\"dudes\":[{\"name\":\"Yehuda\",\"url\":\"http://yehuda\"},{\"name\":\"Alan\",\"url\":\"http://alan\"}]},\"partials\":{\"dude\":\"{{others.foo}}{{name}} ({{url}}) \"},\"expected\":\"Dudes: barYehuda (http://yehuda) barAlan (http://alan) \",\"message\":\"Basic partials output based on current context.\",\"options\":{\"data\":true,\"blockParams\":[],\"knownHelpers\":{\"helperMissing\":true,\"blockHelperMissing\":true,\"each\":true,\"if\":true,\"unless\":true,\"with\":true,\"log\":true,\"lookup\":true}}}",
+   // "{\"template\":\"Dudes: {{#dudes}}{{> dude others=..}}{{/dudes}}\",\"data\":{\"foo\":\"bar\",\"dudes\":[{\"name\":\"Yehuda\",\"url\":\"http://yehuda\"},{\"name\":\"Alan\",\"url\":\"http://alan\"}]},\"partials\":{\"dude\":\"{{others.foo}}{{name}} ({{url}}) \"},\"expected\":\"Dudes: barYehuda (http://yehuda) barAlan (http://alan) \",\"message\":\"Basic partials output based on current context.\",\"options\":{\"data\":true,\"blockParams\":[],\"knownHelpers\":{\"helperMissing\":true,\"blockHelperMissing\":true,\"each\":true,\"if\":true,\"unless\":true,\"with\":true,\"log\":true,\"lookup\":true}}}",
 
 
 ];
