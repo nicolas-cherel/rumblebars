@@ -194,6 +194,9 @@ rustlex! HBExpressionLexer {
     BRACKET_ID_START => |lexer:&mut HBExpressionLexer<R>| { lexer.ID_ANY(); None }
     STRING_START     => |lexer:&mut HBExpressionLexer<R>| { lexer.STRING_PARAM(); None }
 
+    THIS         => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( ".".to_string()  ) ) }
+    PARENT_ALIAS => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( "..".to_string() ) ) }
+
     // ok, pure option parsing for now
   }
 
@@ -433,7 +436,7 @@ fn append_entry(stack: &mut Vec<(Box<Template>, bool)>, e: Box<HBEntry>) {
 }
 
 pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
-  // trimming template handling with a regex, rustlex does not emit tokens on input end,
+  // trimming template handling with a regex, as rustlex does not emit tokens on input end,
   // but it's very (very) convenient for this case
 
   // general case,
