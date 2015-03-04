@@ -24,8 +24,8 @@ fn value_for_key_path_in_context<'a>(
   let mut stack_index = 0;
   let mut first_key = true;
 
-  for key in key_path.iter() {
-    match key.as_slice() {
+  for key in key_path.iter().map(|k| &k[..]) {
+    match key {
       "."  => {continue},
       ".." => {
         stack_index += 1;
@@ -38,7 +38,7 @@ fn value_for_key_path_in_context<'a>(
         continue;
       },
       _ if key.starts_with("@") => {
-        match global_data.get(key.as_slice()) {
+        match global_data.get(key) {
           Some(&val) => {
             ctxt = Some(val);
             continue;
@@ -51,11 +51,11 @@ fn value_for_key_path_in_context<'a>(
 
     ctxt = match ctxt {
       Some(c) => {
-        match (compat, first_key, c.get_key(key.as_slice())) {
+        match (compat, first_key, c.get_key(key)) {
           (true, true, None) => {
             let mut found = None;
             for o in context_stack.iter().rev() {
-              match o.get_key(key.as_slice()) {
+              match o.get_key(key) {
                 v @ Some(_) => {
                   found = v;
                   break;
@@ -269,7 +269,7 @@ impl HBData for Json {
   fn get_key(&self, key: &str) -> Option<&HBData> {
     return match self {
       &Json::Array(ref a) => {
-        if let Ok(num_key) = key.as_slice().parse() {
+        if let Ok(num_key) = (&key).parse() {
           match a.get(num_key) {
             Some(v) => Some(v as &HBData),
             None => None,
@@ -279,7 +279,7 @@ impl HBData for Json {
         }
       },
       &Json::Object(_) => {
-        return match self.find(key.as_slice()) {
+        return match self.find(&key) {
           Some(json) =>  Some(json as &HBData),
           None => None,
         }
@@ -293,7 +293,7 @@ impl HBData for Json {
       &Json::I64(ref i)     => *i != 0,
       &Json::U64(ref u)     => *u != 0,
       &Json::F64(ref f)     => (*f == Float::nan() || *f != 0.0),
-      &Json::String(ref s)  => s.as_slice() != "",
+      &Json::String(ref s)  => &s[..] != "",
       &Json::Boolean(ref b) => *b,
       &Json::Null           => false,
       &Json::Array(ref a)   => !a.is_empty(),
@@ -304,7 +304,7 @@ impl HBData for Json {
   fn keys(&self) -> Option<Vec<&str>> {
     match self {
       &Json::Object(ref o) => {
-        let mut keys:Vec<_> = o.keys().map(|k| {k.as_slice()}).collect();
+        let mut keys:Vec<_> = o.keys().map(|k| &k[..]).collect();
         keys.sort_by(|&:a, b| a.cmp(b));
         Some(keys)
       },
@@ -324,7 +324,7 @@ impl HBData for String {
     HBNodeType::Leaf(self as &HBData)
   }
 
-  fn as_bool(&self) -> bool { self.as_slice() == "" }
+  fn as_bool(&self) -> bool { &self[..] == "" }
 
   fn as_array<'a>(&'a self) -> Option<Vec<&'a HBData>> { None }
   fn get_key<'a>(&'a self, _: &str) -> Option<&'a HBData> { None }
@@ -448,7 +448,7 @@ impl <'a> HelperOptions<'a> {
 
     if key_write_ok.is_ok() {
       if let Ok(str_key) = String::from_utf8(buf) {
-        let key_path = HelperOptions::parse_path(str_key.as_slice());
+        let key_path = HelperOptions::parse_path(&str_key);
         value_for_key_path_in_context(unsafe { ::std::mem::transmute(context) }, &key_path, self.context_stack, self.global_data, self.hb_context.compat)
       } else {
         None
@@ -533,7 +533,7 @@ impl Helper {
     global_data: &HashMap<&str, &'a HBData>
   ) -> HBEvalResult {
 
-    let condition = match params.as_slice() {
+    let condition = match &params[..] {
       [ref val, ..] => match val {
         &HBValHolder::String(ref s) => s.as_bool(),
         &HBValHolder::Path(ref p) => if let Some(v) = value_for_key_path_in_context(context, p, ctxt_stack, global_data, hb_context.compat) {
@@ -559,7 +559,7 @@ impl Helper {
       context_stack: unsafe { ::std::mem::transmute(ctxt_stack) },
     };
 
-    (self.helper_func)(Helper::build_param_vec(context, params, ctxt_stack, global_data, hb_context).as_slice(), &helper_options, out, hb_context)
+    (self.helper_func)(&Helper::build_param_vec(context, params, ctxt_stack, global_data, hb_context), &helper_options, out, hb_context)
   }
 
   fn call_fn<'a, 'b, 'c>(
@@ -584,7 +584,7 @@ impl Helper {
       context_stack: unsafe { ::std::mem::transmute(ctxt_stack) },
     };
 
-    (self.helper_func)(Helper::build_param_vec(context, params, ctxt_stack, global_data, hb_context).as_slice(), &helper_options, out, hb_context)
+    (self.helper_func)(&Helper::build_param_vec(context, params, ctxt_stack, global_data, hb_context), &helper_options, out, hb_context)
   }
 
 }
@@ -682,9 +682,9 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
           })
         },
         HBEntry::Partial(ref exp) => {
-          match exp.base.as_slice() {
+          match &exp.base[..] {
             [ref single] => {
-              match eval_context.partial_with_name(single.as_slice()) {
+              match eval_context.partial_with_name(&single) {
                 Some(t) => {
                   let c_ctxt = if let Some(&HBValHolder::Path(ref p)) = exp.params.get(0) {
                     value_for_key_path_in_context(*ctxt, p, &ctxt_stack, global_data, eval_context.compat).unwrap_or(*ctxt)
@@ -739,16 +739,16 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
         },
 
         HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref render_options, block: None, else_block: None}) => {
-          match base.as_slice() {
-            [ref single] if eval_context.has_helper_with_name(single.as_slice()) => {
-              let helper = eval_context.helper_with_name(single.as_slice()).unwrap();
+          match &base[..] {
+            [ref single] if eval_context.has_helper_with_name(&single) => {
+              let helper = eval_context.helper_with_name(&single).unwrap();
               if render_options.escape {
                 IndentWriter::with_indent(indent.clone(), out, &|w| {
-                  helper.call_fn(*ctxt, params.as_slice(), options.as_slice(), w, eval_context, &ctxt_stack, global_data)
+                  helper.call_fn(*ctxt, &params, &options, w, eval_context, &ctxt_stack, global_data)
                 })
               } else {
                 IndentWriter::with_indent(indent.clone(), &mut out.into_unsafe(), &|w| {
-                  helper.call_fn(*ctxt, params.as_slice(), options.as_slice(), w, eval_context, &ctxt_stack, global_data)
+                  helper.call_fn(*ctxt, &params, &options, w, eval_context, &ctxt_stack, global_data)
                 })
               }
             },
@@ -774,9 +774,9 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
 
         HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref render_options, ref block, ref else_block}) => {
           render_options.escape; // only suppress unused warning
-          match base.as_slice() {
-            [ref single] if eval_context.has_helper_with_name(single.as_slice()) => {
-              let helper = eval_context.helper_with_name(single.as_slice()).unwrap();
+          match &base[..] {
+            [ref single] if eval_context.has_helper_with_name(&single) => {
+              let helper = eval_context.helper_with_name(&single).unwrap();
 
               // collect options of deref'd blocks
               let blocks: Vec<_> = [block, else_block].iter().map(|b| {
@@ -786,14 +786,14 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
                 }
               }).collect();
 
-              if let [opt_block, opt_else_block] = blocks.as_slice() {
+              if let [opt_block, opt_else_block] = &blocks[..] {
                 helper.call_for_block(
                   opt_block,
                   opt_else_block,
                   render_options.inverse,
                   *ctxt,
-                  params.as_slice(),
-                  options.as_slice(),
+                  &params,
+                  &options,
                   out,
                   eval_context,
                   &ctxt_stack,

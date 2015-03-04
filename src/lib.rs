@@ -1,7 +1,6 @@
 #![crate_name="rumblebars"]
 #![feature(plugin)]
 #![feature(old_io)]
-#![feature(core)]
 #![feature(std_misc)]
 #![feature(collections)]
 #![plugin(regex_macros)]

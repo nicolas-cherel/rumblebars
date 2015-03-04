@@ -257,7 +257,7 @@ pub struct HBExpression {
 impl HBExpression {
   pub fn path(&self) -> String {
     let mut r = String::new();
-    self.base.iter().take(self.base.len() - 1).fold(&mut r, |mut a, i| {a.push_str(i.as_slice()); a.push('.'); a});
+    self.base.iter().take(self.base.len() - 1).fold(&mut r, |mut a, i| {a.push_str(&i); a.push('.'); a});
     self.base.last().map(|i| r.push_str(i));
     r
   }
@@ -364,7 +364,7 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpressionParsing, (ParseError, Op
             _ => { break; }
           }
         }
-        let literal_param = match param_path.as_slice() {
+        let literal_param = match &param_path[..] {
           [ref s] => {
             if let Ok(j) = Json::from_str(s) {
               Some(HBValHolder::Literal(j, s.clone()))
@@ -417,7 +417,7 @@ fn append_entry(stack: &mut Vec<(Box<Template>, bool)>, e: Box<HBEntry>) {
     (Some(&mut(ref mut block, _)), &HBEntry::Raw(ref s)) => {
       if let Some(ref mut boxed) = (***block).last_mut() {
         if let HBEntry::Raw(ref mut existing) = ***boxed {
-          existing.push_str(s.as_slice());
+          existing.push_str(&s);
           false
         } else {
           true
@@ -468,21 +468,21 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
         Unit::AppendRaw(Box::new(HBEntry::Raw(s)))
       },
       TokSimpleExp(ref exp) => {
-        if let Ok((lead_wp, hb, trail_wp)) = parse_hb_expression(exp.as_slice()) {
+        if let Ok((lead_wp, hb, trail_wp)) = parse_hb_expression(&exp) {
           Unit::Append(lead_wp, Box::new(HBEntry::Eval(hb)), trail_wp)
         } else {
           return Result::Err((ParseError::InvalidExpression, Some(format!("Could not parse {:?}", exp))));
         }
       },
       TokCommentExp(ref exp) => {
-        if let Ok((lead_wp, hb, trail_wp)) = parse_hb_expression(exp.as_slice()) {
+        if let Ok((lead_wp, hb, trail_wp)) = parse_hb_expression(&exp) {
           Unit::TrimOnly(lead_wp, Box::new(HBEntry::Eval(hb)), trail_wp)
         } else {
           return Result::Err((ParseError::InvalidExpression, Some(format!("Could not parse {:?}", exp))));
         }
       },
       TokNoEscapeExp(ref exp) => {
-        if let Ok((lead_wp, mut hb, trail_wp)) = parse_hb_expression(exp.as_slice()) {
+        if let Ok((lead_wp, mut hb, trail_wp)) = parse_hb_expression(&exp) {
           hb.render_options.escape = false;
           Unit::Append(lead_wp, Box::new(HBEntry::Eval(hb)), trail_wp)
         } else {
@@ -490,14 +490,14 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
         }
       },
       TokPartialExp(ref exp) => {
-        if let Ok((lead_wp, hb, trail_wp)) = parse_hb_expression(exp.as_slice()) {
+        if let Ok((lead_wp, hb, trail_wp)) = parse_hb_expression(&exp) {
           Unit::AppendAutoTrim(lead_wp, Box::new(HBEntry::Partial(hb)), trail_wp)
         } else {
           return Result::Err((ParseError::InvalidExpression, Some(format!("Could not parse {:?}", exp))));
         }
       },
       TokBlockExp(ref exp, inverse) => {
-        if let Ok((lead_wp, mut hb, trail_wp)) = parse_hb_expression(exp.as_slice()) {
+        if let Ok((lead_wp, mut hb, trail_wp)) = parse_hb_expression(&exp) {
           hb.render_options.inverse = inverse;
           Unit::Shift(lead_wp, Box::new(HBEntry::Eval(hb)), false, trail_wp)
         } else {
@@ -505,14 +505,14 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
         }
       },
       TokBlockElseCond(ref exp) => {
-        if let Ok((lead_wp, hb, trail_wp)) = parse_hb_expression(exp.as_slice()) {
+        if let Ok((lead_wp, hb, trail_wp)) = parse_hb_expression(&exp) {
           Unit::Shift(lead_wp, Box::new(HBEntry::Eval(hb)), true, trail_wp)
         } else {
           return Result::Err((ParseError::InvalidExpression, Some(format!("Could not parse {:?}", exp))));
         }
       },
       TokBlockEndExp(ref exp) => {
-        if let Ok((lead_wp, hb, trail_wp)) = parse_hb_expression(exp.as_slice()) {
+        if let Ok((lead_wp, hb, trail_wp)) = parse_hb_expression(&exp) {
           Unit::Reduce(lead_wp, Box::new(HBEntry::Eval(hb)), trail_wp)
         } else {
           return Result::Err((ParseError::InvalidExpression, Some(format!("Could not parse {:?}", exp))));
@@ -664,7 +664,7 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
           // (remove entries from stack and attach them to their parent )
 
           // check if it's a signle block or a block/else reduction
-          let has_else = match stack.as_slice() {
+          let has_else = match &stack[..] {
             [_, (_, false), ( _, true)] => true,
             _ => false,
           };
