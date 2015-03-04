@@ -1006,15 +1006,6 @@ mod tests {
     eval(&templ, &json, &mut buf, &Default::default()).unwrap();
   }
 
-  #[test]
-  fn safe_writing_help() {
-    let mut buf = Vec::<u8>::new();
-    SafeWriting::with_html_safe_writer(&mut buf, &|out| {
-      "pouet pouet".to_string().write_value(out)
-    }).ok();
-
-    assert_eq!(String::from_utf8(buf).ok().unwrap(), "pouet pouet")
-  }
 
 }
 
