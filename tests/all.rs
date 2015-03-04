@@ -14,16 +14,21 @@ mod eval {
 
   use serialize::json::Json;
   use std::default::Default;
-  use std::collections::HashMap;
 
   use rumblebars::eval;
   use rumblebars::parse;
   use rumblebars::EvalContext;
-  use rumblebars::Helper;
-  use rumblebars::HelperOptions;
-  use rumblebars::HBData;
-  use rumblebars::HBEvalResult;
-  use rumblebars::SafeWriting;
+
+  #[test]
+  fn from_str() {
+    let json: Json = r##"{"p": "hello"}"##.parse().ok().unwrap();
+    let tmpl = r##"{{p}}"##.parse().ok().unwrap();
+    let mut buf: Vec<u8> = Vec::new();
+
+    eval(&tmpl, &json, &mut buf, &Default::default()).unwrap();
+
+    assert_eq!(String::from_utf8(buf).unwrap(), "hello");
+  }
 
   #[test]
   fn simple_render() {

@@ -739,10 +739,19 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
   }
 }
 
+use ::std::str::FromStr;
+impl FromStr for Template {
+  type Err = (ParseError, Option<String>);
+
+  fn from_str(s: &str) -> Result<Self, <Self as FromStr>::Err> {
+    parse(s)
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use std::default::Default;
-  use super::{parse, parse_hb_expression, HBEntry, HBExpression, HBValHolder};
+  use super::{parse, parse_hb_expression, HBEntry, HBExpression, HBValHolder, Template};
 
   #[test]
   fn hb_simple() {
@@ -910,6 +919,12 @@ mod tests {
       },
       Err(_)  => (),
     }
+  }
+
+  #[test]
+  fn from_str() {
+    let template = "t {{u}} v".parse::<Template>();
+    assert!(template.is_ok())
   }
 
   #[test]
