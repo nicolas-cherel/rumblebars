@@ -918,7 +918,7 @@ mod tests {
     assert_eq!("tada", match p.get(0) {
       Some(& ref boxed_entry) => {
         match **boxed_entry {
-          HBEntry::Raw(ref s) => s.as_slice(),
+          HBEntry::Raw(ref s) => &s[..],
           _ => "",
         }
       }
@@ -932,7 +932,7 @@ mod tests {
     assert_eq!("tada", match p.get(0) {
       Some(& ref boxed_entry) => {
         match **boxed_entry {
-          HBEntry::Eval(HBExpression {ref base, ..}) => base.iter().next().unwrap().as_slice(),
+          HBEntry::Eval(HBExpression {ref base, ..}) => &base.iter().next().unwrap()[..],
           _ => "",
         }
       }
@@ -962,7 +962,7 @@ mod tests {
     assert_eq!("tidi ", match p.get(0) {
       Some(& ref boxed_entry) => {
         match **boxed_entry {
-          HBEntry::Raw(ref s) => s.as_slice(),
+          HBEntry::Raw(ref s) => &s[..],
           _ => "",
         }
       }
@@ -971,7 +971,7 @@ mod tests {
     assert_eq!("tada", match p.get(1) {
       Some(& ref boxed_entry) => {
         match **boxed_entry {
-          HBEntry::Eval(HBExpression {ref base, ..}) => base.iter().next().unwrap().as_slice(),
+          HBEntry::Eval(HBExpression {ref base, ..}) => &base.iter().next().unwrap()[..],
           _ => "",
         }
       }
@@ -980,7 +980,7 @@ mod tests {
     assert_eq!(" todo ", match p.get(2) {
       Some(& ref boxed_entry) => {
         match **boxed_entry {
-          HBEntry::Raw(ref s) => s.as_slice(),
+          HBEntry::Raw(ref s) => &s[..],
           _ => "",
         }
       }
@@ -989,7 +989,7 @@ mod tests {
     assert_eq!("tudu", match p.get(3) {
       Some(& ref boxed_entry) => {
         match **boxed_entry {
-          HBEntry::Eval(HBExpression {ref base, ..}) => base.iter().next().unwrap().as_slice(),
+          HBEntry::Eval(HBExpression {ref base, ..}) => &base.iter().next().unwrap()[..],
           _ => "",
         }
       }
@@ -998,7 +998,7 @@ mod tests {
     assert_eq!(" bar", match p.get(4) {
       Some(& ref boxed_entry) => {
         match **boxed_entry {
-          HBEntry::Raw(ref s) => s.as_slice(),
+          HBEntry::Raw(ref s) => &s[..],
           _ => "",
         }
       }
