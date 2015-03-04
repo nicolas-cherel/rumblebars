@@ -1,7 +1,5 @@
 #![crate_name="rumblebars"]
 #![feature(plugin)]
-#![feature(box_patterns)]
-#![feature(box_syntax)]
 #![feature(old_io)]
 #![feature(core)]
 #![feature(std_misc)]
