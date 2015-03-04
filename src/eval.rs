@@ -665,7 +665,8 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
   //  - raw copy,
   //  - simple expression evaluation (render value execute helper call)
   //  - partial evalutation, stacking each entry from registered partial)
-  //  - block evaluation, stacking each entry of block with parameterized context, with basic flow control (each, if)
+  //  - block evaluation, stacking each entry of block with parameterized
+  //    context, with basic flow control (each, if)
 
   // given the above, we start by stacking each entries of template root level
   // each entry comes along with :
@@ -676,6 +677,8 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
     (e, data, context_stack.iter().map(|s| *s).collect::<Vec<_>>(), indent.clone())
   }).collect();
 
+  // used for storage of partials optional keys, computed at evaluation
+  // this can leak, but probably not in relevant cases.
   let mut partial_options_contexts = vec![];
 
   while stack.len() > 0 {

@@ -580,7 +580,7 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
         //   note that end of input trailing space is handled by a prelude replace regex
         //
 
-        // we either use owned leading whitespace, use previous elligible trailing whitespace
+        // we use owned leading whitespace, or use previous elligible trailing whitespace
         // or fallback to a default
         let lead_space_with_fallbacks = lead_wp.clone()
           .map(|wp| (wp, true))
