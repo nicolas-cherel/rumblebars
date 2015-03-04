@@ -292,7 +292,7 @@ impl HBData for Json {
     return match self {
       &Json::I64(ref i)     => *i != 0,
       &Json::U64(ref u)     => *u != 0,
-      &Json::F64(ref f)     => (*f == Float::nan() || *f != 0.0),
+      &Json::F64(ref f)     => *f != 0.0 && ! f.is_nan(),
       &Json::String(ref s)  => &s[..] != "",
       &Json::Boolean(ref b) => *b,
       &Json::Null           => false,
