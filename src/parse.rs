@@ -413,11 +413,15 @@ enum Unit {
 
 // append entry to stack but if entry is raw data, append it to last raw entry
 fn append_entry(stack: &mut Vec<(Box<Template>, bool)>, e: Box<HBEntry>) {
-  let may_push_entry = match (stack.last_mut(), &e) {
-    (Some(&mut(box ref mut block, _)), &box HBEntry::Raw(ref s)) => {
-      if let Some(&mut box HBEntry::Raw(ref mut existing)) = block.last_mut() {
-        existing.push_str(s.as_slice());
-        false
+  let may_push_entry = match (stack.last_mut(), &*e) {
+    (Some(&mut(ref mut block, _)), &HBEntry::Raw(ref s)) => {
+      if let Some(ref mut boxed) = (***block).last_mut() {
+        if let HBEntry::Raw(ref mut existing) = ***boxed {
+          existing.push_str(s.as_slice());
+          false
+        } else {
+          true
+        }
       } else {
         true
       }
@@ -449,7 +453,7 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
   let lexer = HandleBarsLexer::new(BufReader::new(trimmed.as_bytes()));
 
   // parse stack entry tuple: (template, is_else_block)
-  let mut stack = vec![(box vec![], false)];
+  let mut stack = vec![(Box::new(vec![]) , false)];
 
   let trim_lead_space_matcher = regex!("((?:[:blank:]|\r?\n)*)(\r?\n)[:blank:]*$");
   let trim_trail_space_matcher = regex!("^([:blank:]*\r?\n)(.*)");
@@ -461,18 +465,18 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
     // handle each token specifities and distribute them to generic shift/reduce handlings
     let token_result = match tok {
       TokRaw(s) => {
-        Unit::AppendRaw(box HBEntry::Raw(s))
+        Unit::AppendRaw(Box::new(HBEntry::Raw(s)))
       },
       TokSimpleExp(ref exp) => {
         if let Ok((lead_wp, hb, trail_wp)) = parse_hb_expression(exp.as_slice()) {
-          Unit::Append(lead_wp, box HBEntry::Eval(hb), trail_wp)
+          Unit::Append(lead_wp, Box::new(HBEntry::Eval(hb)), trail_wp)
         } else {
           return Result::Err((ParseError::InvalidExpression, Some(format!("Could not parse {:?}", exp))));
         }
       },
       TokCommentExp(ref exp) => {
         if let Ok((lead_wp, hb, trail_wp)) = parse_hb_expression(exp.as_slice()) {
-          Unit::TrimOnly(lead_wp, box HBEntry::Eval(hb), trail_wp)
+          Unit::TrimOnly(lead_wp, Box::new(HBEntry::Eval(hb)), trail_wp)
         } else {
           return Result::Err((ParseError::InvalidExpression, Some(format!("Could not parse {:?}", exp))));
         }
@@ -480,14 +484,14 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
       TokNoEscapeExp(ref exp) => {
         if let Ok((lead_wp, mut hb, trail_wp)) = parse_hb_expression(exp.as_slice()) {
           hb.render_options.escape = false;
-          Unit::Append(lead_wp, box HBEntry::Eval(hb), trail_wp)
+          Unit::Append(lead_wp, Box::new(HBEntry::Eval(hb)), trail_wp)
         } else {
           return Result::Err((ParseError::InvalidExpression, Some(format!("Could not parse {:?}", exp))));
         }
       },
       TokPartialExp(ref exp) => {
         if let Ok((lead_wp, hb, trail_wp)) = parse_hb_expression(exp.as_slice()) {
-          Unit::AppendAutoTrim(lead_wp, box HBEntry::Partial(hb), trail_wp)
+          Unit::AppendAutoTrim(lead_wp, Box::new(HBEntry::Partial(hb)), trail_wp)
         } else {
           return Result::Err((ParseError::InvalidExpression, Some(format!("Could not parse {:?}", exp))));
         }
@@ -495,21 +499,21 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
       TokBlockExp(ref exp, inverse) => {
         if let Ok((lead_wp, mut hb, trail_wp)) = parse_hb_expression(exp.as_slice()) {
           hb.render_options.inverse = inverse;
-          Unit::Shift(lead_wp, box HBEntry::Eval(hb), false, trail_wp)
+          Unit::Shift(lead_wp, Box::new(HBEntry::Eval(hb)), false, trail_wp)
         } else {
           return Result::Err((ParseError::InvalidExpression, Some(format!("Could not parse {:?}", exp))));
         }
       },
       TokBlockElseCond(ref exp) => {
         if let Ok((lead_wp, hb, trail_wp)) = parse_hb_expression(exp.as_slice()) {
-          Unit::Shift(lead_wp, box HBEntry::Eval(hb), true, trail_wp)
+          Unit::Shift(lead_wp, Box::new(HBEntry::Eval(hb)), true, trail_wp)
         } else {
           return Result::Err((ParseError::InvalidExpression, Some(format!("Could not parse {:?}", exp))));
         }
       },
       TokBlockEndExp(ref exp) => {
         if let Ok((lead_wp, hb, trail_wp)) = parse_hb_expression(exp.as_slice()) {
-          Unit::Reduce(lead_wp, box HBEntry::Eval(hb), trail_wp)
+          Unit::Reduce(lead_wp, Box::new(HBEntry::Eval(hb)), trail_wp)
         } else {
           return Result::Err((ParseError::InvalidExpression, Some(format!("Could not parse {:?}", exp))));
         }
@@ -520,7 +524,7 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
       // direct append without trimming
       Unit::AppendRaw(entry) => {
         match previous_trail_whitespace {
-          Some((s, true)) => append_entry(&mut stack, box HBEntry::Raw(s)),
+          Some((s, true)) => append_entry(&mut stack, Box::new(HBEntry::Raw(s))),
           _ => ()
         };
 
@@ -529,22 +533,22 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
       },
       // direct append with explicit trimming
       Unit::Append(lead_wp, entry, trail_wp) => {
-        let (remove_lead_wp, remove_trail_wp) = match entry {
-          box HBEntry::Eval(ref exp) => (exp.render_options.no_leading_whitespace, exp.render_options.no_trailing_whitespace),
-          box HBEntry::Partial(ref exp) => (exp.render_options.no_leading_whitespace, exp.render_options.no_trailing_whitespace),
+        let (remove_lead_wp, remove_trail_wp) = match *entry {
+          HBEntry::Eval(ref exp) => (exp.render_options.no_leading_whitespace, exp.render_options.no_trailing_whitespace),
+          HBEntry::Partial(ref exp) => (exp.render_options.no_leading_whitespace, exp.render_options.no_trailing_whitespace),
           _ => (false, false),
         };
 
         // if we have previous trail, it's our current leading, so skip if we trim lead
         match (previous_trail_whitespace, remove_lead_wp) {
-          (Some((s, true)), false) => append_entry(&mut stack, box HBEntry::Raw(s)),
+          (Some((s, true)), false) => append_entry(&mut stack, Box::new(HBEntry::Raw(s))),
           _ => ()
         };
 
         previous_trail_whitespace = trail_wp.map(|s| (s, !remove_trail_wp) );
 
         match (lead_wp, remove_lead_wp) {
-          (Some(space), false) => append_entry(&mut stack, box HBEntry::Raw(space)),
+          (Some(space), false) => append_entry(&mut stack, Box::new(HBEntry::Raw(space))),
           _ => ()
         }
 
@@ -565,9 +569,9 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
         };
 
         // extract whitespace options
-        let (remove_lead_wp, remove_trail_wp) = match entry {
-          box HBEntry::Eval(ref exp) => (exp.render_options.no_leading_whitespace, exp.render_options.no_trailing_whitespace),
-          box HBEntry::Partial(ref exp) => (exp.render_options.no_leading_whitespace, exp.render_options.no_trailing_whitespace),
+        let (remove_lead_wp, remove_trail_wp) = match *entry {
+          HBEntry::Eval(ref exp) => (exp.render_options.no_leading_whitespace, exp.render_options.no_trailing_whitespace),
+          HBEntry::Partial(ref exp) => (exp.render_options.no_leading_whitespace, exp.render_options.no_trailing_whitespace),
           _ => (false, false),
         };
 
@@ -614,7 +618,7 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
                 }
 
                 if to_insert.len() > 0 && !remove_lead_wp {
-                  append_entry(&mut stack, box HBEntry::Raw(to_insert));
+                  append_entry(&mut stack, Box::new(HBEntry::Raw(to_insert)));
                 }
 
                 (true, trail_m, trail_k)
@@ -630,7 +634,7 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
         let usable_previous = previous_trail_whitespace.and_then(|(s, can_use)| if can_use { Some(s) } else { None });
 
         if let (false, false, Some(space)) = (trimmed, remove_lead_wp, lead_wp.or(usable_previous)) {
-          append_entry(&mut stack, box HBEntry::Raw(space));
+          append_entry(&mut stack, Box::new(HBEntry::Raw(space)));
         }
 
         // keep elligible trailing whitespace for next expression auto trimming check
@@ -639,8 +643,8 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
         if shift || append {
           // first, just handle partial trimming specific handling for indentation
           if trimmed && entry.is_partial() {
-            match entry {
-              box HBEntry::Partial(HBExpression {render_options: RenderOptions {indent: Some(ref s), ..}, ..}) => append_entry(&mut stack, box HBEntry::Raw(s.clone())),
+            match *entry {
+              HBEntry::Partial(HBExpression {render_options: RenderOptions {indent: Some(ref s), ..}, ..}) => append_entry(&mut stack, Box::new(HBEntry::Raw(s.clone()))),
               _ => ()
             }
           }
@@ -652,7 +656,7 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
 
           if shift {
             // compilation shifting : entry was pushed, and a new collector is inserted
-            stack.push((box vec![], is_else));
+            stack.push((Box::new(vec![]), is_else));
           }
 
         } else if reduce {
@@ -673,30 +677,44 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
           };
 
           // attach content to parent
-          if let Some(&mut (box ref mut parents, _)) = stack.last_mut() {
-            if let box HBEntry::Eval(ref hb) = entry {
-              match parents.last_mut() {
-                Some(&mut box HBEntry::Eval(ref mut parent)) => {
-                  if parent.base == hb.base {
-                    match pop {
-                      (some_else, Some((block, _))) => {
-                        parent.block = Some(block);
-                        if let Some((else_block, _)) = some_else {
-                          parent.else_block = Some(else_block);
-                        }
-                      },
-                      _ => panic!("(some_else, Some((block, _))) pattern should always be matched — parse.rs#parse")
-                    }
+          let mut err = Ok(vec![]); // error checking on reduce
+          if let Some(&mut (ref mut parents, _)) = stack.last_mut() {
+            if let HBEntry::Eval(ref hb) = *entry {
+              match (***parents).last_mut() {
+                Some(ref mut boxed_parent) => {
+                  if let HBEntry::Eval(ref mut parent) = ***boxed_parent {
+                    if parent.base == hb.base {
+                      match pop {
+                        (some_else, Some((block, _))) => {
+                          parent.block = Some(block);
+                          if let Some((else_block, _)) = some_else {
+                            parent.else_block = Some(else_block);
+                          }
+                        },
+                        _ => panic!("(some_else, Some((block, _))) pattern should always be matched — parse.rs#parse")
+                      }
 
+                    } else {
+                      err = Err((ParseError::UnmatchedBlock, Some(format!("‘{}’ does not match ‘{}’", hb.path(), parent.path()))))
+
+                    }
                   } else {
-                    return Err((ParseError::UnmatchedBlock, Some(format!("‘{}’ does not match ‘{}’", hb.path(), parent.path()))))
+                    err = Err((ParseError::UnexpectedBlockClose, Some(format!("‘{}’ does not close any block", hb.path()))));
                   }
                 }
                 _ => {
-                  return Err((ParseError::UnexpectedBlockClose, Some(format!("‘{}’ does not close any block", hb.path()))))
+                  err = Err((ParseError::UnexpectedBlockClose, Some(format!("‘{}’ does not close any block", hb.path()))));
                 }
               }
+            } else {
+              panic!("Should not reach: there's a bug in handelbars template@ parser, we're doing a block reduce on invalid parsing state");
             }
+          } else {
+            panic!("Should not reach: there's a bug in handelbars template@ parser, we're doing a block reduce on invalid parsing state");
+          }
+
+          if err.is_err() {
+            return err;
           }
 
         }
@@ -709,7 +727,7 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
 
   match previous_trail_whitespace {
     Some((ref s, true)) =>  {
-      append_entry(&mut stack, box HBEntry::Raw(s.clone()))
+      append_entry(&mut stack, Box::new(HBEntry::Raw(s.clone())))
     },
     _ => ()
   };
@@ -898,7 +916,12 @@ mod tests {
   fn parse_raw() {
     let p = parse("tada").unwrap_or(Default::default());
     assert_eq!("tada", match p.get(0) {
-      Some(&box HBEntry::Raw(ref s)) => s.as_slice(),
+      Some(& ref boxed_entry) => {
+        match **boxed_entry {
+          HBEntry::Raw(ref s) => s.as_slice(),
+          _ => "",
+        }
+      }
       _ => "",
     });
   }
@@ -907,7 +930,12 @@ mod tests {
   fn parse_exp() {
     let p = parse("{{tada}}").unwrap_or(Default::default());
     assert_eq!("tada", match p.get(0) {
-      Some(&box HBEntry::Eval(HBExpression {ref base, ..})) => base.iter().next().unwrap().as_slice(),
+      Some(& ref boxed_entry) => {
+        match **boxed_entry {
+          HBEntry::Eval(HBExpression {ref base, ..}) => base.iter().next().unwrap().as_slice(),
+          _ => "",
+        }
+      }
       _ => "",
     });
   }
@@ -917,8 +945,11 @@ mod tests {
   fn parse_else_block() {
     let p = parse("{{#tada}}i{{else}}o{{/tada}}").unwrap_or(Default::default());;
     assert_eq!(true, match p.get(0) {
-      Some(&box HBEntry::Eval(HBExpression {ref base, ref params, ref options, ref render_options, ref block, ref else_block})) => {
-        match (block, else_block) { (&Some(_), &Some(_)) => true, _ => false }
+      Some(& ref boxed_entry) => {
+        match **boxed_entry {
+          HBEntry::Eval(HBExpression {ref base, ref params, ref options, ref render_options, ref block, ref else_block}) => match (block, else_block) { (&Some(_), &Some(_)) => true, _ => false },
+          _ => false,
+        }
       },
       _ => false,
     });
@@ -929,23 +960,48 @@ mod tests {
   fn parse_exp_entangled() {
     let p = parse("tidi {{tada}} todo {{tudu}} bar").unwrap_or(Default::default());
     assert_eq!("tidi ", match p.get(0) {
-      Some(&box HBEntry::Raw(ref s)) => s.as_slice(),
+      Some(& ref boxed_entry) => {
+        match **boxed_entry {
+          HBEntry::Raw(ref s) => s.as_slice(),
+          _ => "",
+        }
+      }
       _ => "",
     });
     assert_eq!("tada", match p.get(1) {
-      Some(&box HBEntry::Eval(HBExpression {ref base, ..})) => base.iter().next().unwrap().as_slice(),
+      Some(& ref boxed_entry) => {
+        match **boxed_entry {
+          HBEntry::Eval(HBExpression {ref base, ..}) => base.iter().next().unwrap().as_slice(),
+          _ => "",
+        }
+      }
       _ => "",
     });
     assert_eq!(" todo ", match p.get(2) {
-      Some(&box HBEntry::Raw(ref s)) => s.as_slice(),
+      Some(& ref boxed_entry) => {
+        match **boxed_entry {
+          HBEntry::Raw(ref s) => s.as_slice(),
+          _ => "",
+        }
+      }
       _ => "",
     });
     assert_eq!("tudu", match p.get(3) {
-      Some(&box HBEntry::Eval(HBExpression {ref base, ..})) => base.iter().next().unwrap().as_slice(),
+      Some(& ref boxed_entry) => {
+        match **boxed_entry {
+          HBEntry::Eval(HBExpression {ref base, ..}) => base.iter().next().unwrap().as_slice(),
+          _ => "",
+        }
+      }
       _ => "",
     });
     assert_eq!(" bar", match p.get(4) {
-      Some(&box HBEntry::Raw(ref s)) => s.as_slice(),
+      Some(& ref boxed_entry) => {
+        match **boxed_entry {
+          HBEntry::Raw(ref s) => s.as_slice(),
+          _ => "",
+        }
+      }
       _ => "",
     });
   }

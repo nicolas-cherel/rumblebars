@@ -675,13 +675,13 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
 
   while stack.len() > 0 {
     let w_ok = if let Some((ref templ, ref ctxt, ref ctxt_stack, ref indent)) = stack.pop() {
-      match templ {
-        &&box HBEntry::Raw(ref s) => {
+      match ***templ {
+        HBEntry::Raw(ref s) => {
           IndentWriter::with_indent(indent.clone(), &mut out.into_unsafe(), &|w| {
             w.write_str(&s)
           })
         },
-        &&box HBEntry::Partial(ref exp) => {
+        HBEntry::Partial(ref exp) => {
           match exp.base.as_slice() {
             [ref single] => {
               match eval_context.partial_with_name(single.as_slice()) {
@@ -738,7 +738,7 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
           }
         },
 
-        &&box HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref render_options, block: None, else_block: None}) => {
+        HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref render_options, block: None, else_block: None}) => {
           match base.as_slice() {
             [ref single] if eval_context.has_helper_with_name(single.as_slice()) => {
               let helper = eval_context.helper_with_name(single.as_slice()).unwrap();
@@ -772,7 +772,7 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
           }
         },
 
-        &&box HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref render_options, ref block, ref else_block}) => {
+        HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref render_options, ref block, ref else_block}) => {
           render_options.escape; // only suppress unused warning
           match base.as_slice() {
             [ref single] if eval_context.has_helper_with_name(single.as_slice()) => {
@@ -781,7 +781,7 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
               // collect options of deref'd blocks
               let blocks: Vec<_> = [block, else_block].iter().map(|b| {
                 match b {
-                  &&Some(box ref t) => Some(t),
+                  &&Some(ref t) => Some(&**t),
                   &&None => None,
                 }
               }).collect();
