@@ -137,11 +137,16 @@ pub enum SafeWriting<'a> {
 }
 
 impl <'a> SafeWriting<'a> {
-  fn into_unsafe(&mut self) -> SafeWriting {
+  pub fn into_unsafe(&mut self) -> SafeWriting {
     match self {
       &mut SafeWriting::Safe(ref mut w) => SafeWriting::Unsafe(w.writer()),
       &mut SafeWriting::Unsafe(ref mut w) => SafeWriting::Unsafe(w),
     }
+  }
+
+  pub fn with_html_safe_writer(out: &mut Writer, safe: &Fn(&mut SafeWriting) -> HBEvalResult) -> HBEvalResult {
+    let mut html_safe = HTMLSafeWriter::new(out);
+    safe(&mut SafeWriting::Safe(&mut html_safe))
   }
 }
 
@@ -999,6 +1004,16 @@ mod tests {
     let mut buf: Vec<u8> = Vec::new();
 
     eval(&templ, &json, &mut buf, &Default::default()).unwrap();
+  }
+
+  #[test]
+  fn safe_writing_help() {
+    let mut buf = Vec::<u8>::new();
+    SafeWriting::with_html_safe_writer(&mut buf, &|out| {
+      "pouet pouet".to_string().write_value(out)
+    }).ok();
+
+    assert_eq!(String::from_utf8(buf).ok().unwrap(), "pouet pouet")
   }
 
 }
