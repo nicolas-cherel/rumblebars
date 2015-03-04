@@ -2,14 +2,14 @@
 #![feature(plugin)]
 #![feature(box_patterns)]
 #![feature(box_syntax)]
-#![feature(io)]
+#![feature(old_io)]
 #![feature(core)]
 #![feature(std_misc)]
+#![feature(collections)]
 #![plugin(regex_macros)]
 #![plugin(rustlex)]
 
 extern crate regex;
-extern crate regex_macros;
 extern crate rustlex;
 
 extern crate "rustc-serialize" as serialize;
