@@ -375,11 +375,11 @@ impl <'a> HBData for FallbackToOptions<'a> {
   }
 }
 
-pub type HBHelperFunction = fn(params: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, hb_context: &EvalContext) -> HBEvalResult;
+pub type HelperFunction = fn(params: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, hb_context: &EvalContext) -> HBEvalResult;
 
 #[derive(Copy)]
 pub struct Helper {
-  helper_func: HBHelperFunction,
+  helper_func: HelperFunction,
 }
 
 pub type HelperOptionsByName<'a> = HashMap<&'a String, &'a (HBData + 'a)>;
@@ -502,7 +502,7 @@ impl <'a> HelperOptions<'a> {
 }
 
 impl Helper {
-  pub fn new_with_function(f: HBHelperFunction) -> Helper {
+  pub fn new_with_function(f: HelperFunction) -> Helper {
     Helper { helper_func: f }
   }
 
@@ -634,8 +634,8 @@ impl EvalContext {
     return self.partials.get(name);
   }
 
-  pub fn register_helper(&mut self, name: String, h: Helper) {
-    self.helpers.insert(name, h);
+  pub fn register_helper(&mut self, name: String, h: HelperFunction) {
+    self.helpers.insert(name, Helper::new_with_function(h));
   }
 
   pub fn helper_with_name(&self, name: &str) -> Option<&Helper> {

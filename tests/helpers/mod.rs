@@ -8,7 +8,6 @@ use std::collections::HashMap;
 use rumblebars::eval;
 use rumblebars::parse;
 use rumblebars::EvalContext;
-use rumblebars::Helper;
 use rumblebars::HelperOptions;
 use rumblebars::HBEvalResult;
 use rumblebars::SafeWriting;
@@ -259,7 +258,7 @@ fn helper() {
   let mut eval_ctxt: EvalContext = Default::default();
   let mut buf: Vec<u8> = Vec::new();
 
-  eval_ctxt.register_helper("p".to_string(), Helper::new_with_function(p));
+  eval_ctxt.register_helper("p".to_string(), p);
 
   eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
@@ -282,7 +281,7 @@ fn helper_context() {
   let mut eval_ctxt: EvalContext = Default::default();
   let mut buf: Vec<u8> = Vec::new();
 
-  eval_ctxt.register_helper("c".to_string(), Helper::new_with_function(c));
+  eval_ctxt.register_helper("c".to_string(), c);
 
   eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
@@ -305,7 +304,7 @@ fn helper_val() {
   let mut eval_ctxt: EvalContext = Default::default();
   let mut buf: Vec<u8> = Vec::new();
 
-  eval_ctxt.register_helper("v".to_string(), Helper::new_with_function(v));
+  eval_ctxt.register_helper("v".to_string(), v);
 
   eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
@@ -327,7 +326,7 @@ fn helper_cond() {
   let mut eval_ctxt: EvalContext = Default::default();
   let mut buf: Vec<u8> = Vec::new();
 
-  eval_ctxt.register_helper("if".to_string(), Helper::new_with_function(cd));
+  eval_ctxt.register_helper("if".to_string(), cd);
 
   eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
@@ -348,7 +347,7 @@ fn helper_globals() {
   let mut eval_ctxt: EvalContext = Default::default();
   let mut buf: Vec<u8> = Vec::new();
 
-  eval_ctxt.register_helper("globs".to_string(), Helper::new_with_function(globs));
+  eval_ctxt.register_helper("globs".to_string(), globs);
 
   eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
@@ -371,7 +370,7 @@ fn helper_root_check() {
   let mut eval_ctxt: EvalContext = Default::default();
   let mut buf: Vec<u8> = Vec::new();
 
-  eval_ctxt.register_helper("for_root_check".to_string(), Helper::new_with_function(for_root_check));
+  eval_ctxt.register_helper("for_root_check".to_string(), for_root_check);
 
   eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
@@ -404,7 +403,7 @@ fn safe_writing_help() {
   let tmpl = parse(r##"{{example_helper}}"##).ok().unwrap();
   let mut eval_ctxt: EvalContext = Default::default();
   let mut buf = Vec::<u8>::new();
-  eval_ctxt.register_helper("example_helper".to_string(), Helper::new_with_function(example_helper));
+  eval_ctxt.register_helper("example_helper".to_string(), example_helper);
 
   eval(&tmpl, &json, &mut buf, &eval_ctxt).ok();
 

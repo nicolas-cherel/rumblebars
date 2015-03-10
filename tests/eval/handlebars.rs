@@ -5,7 +5,6 @@ use serialize::json::Json;
 
 use rumblebars::HBData;
 use rumblebars::EvalContext;
-use rumblebars::Helper;
 
 macro_rules! equals_expected(
   ($res: expr, $expected: expr, $message: expr) => (
@@ -42,8 +41,8 @@ fn setup_test_specific_context(context: &mut EvalContext, data: &str) {
   match data {
     // needst test_helper
     "{\"template\":\"{{test_helper}} {{#if cruel}}Goodbye {{cruel}} {{world}}!{{/if}}\",\"data\":{\"cruel\":\"cruel\"},\"expected\":\"found it! Goodbye cruel world!!\",\"options\":{\"data\":true,\"blockParams\":[],\"knownHelpers\":{\"helperMissing\":true,\"blockHelperMissing\":true,\"each\":true,\"if\":true,\"unless\":true,\"with\":true,\"log\":true,\"lookup\":true}}}" => {
-      context.register_helper("test_helper".to_string(), Helper::new_with_function(helpers::test_helper));
-      context.register_helper("world".to_string(), Helper::new_with_function(helpers::world));
+      context.register_helper("test_helper".to_string(), helpers::test_helper);
+      context.register_helper("world".to_string(), helpers::world);
     },
     "{\"template\":\"Hello {{name}}. You have just won ${{value}}!{{#in_ca}} Well, ${{taxed_value}}, after taxes.{{/in_ca}}\",\"data\":{\"name\":\"Chris\",\"value\":10000,\"taxed_value\":6000,\"in_ca\":true},\"expected\":\"Hello Chris. You have just won $10000! Well, $6000, after taxes.\",\"message\":\"the hello world mustache example works\"}" => {
       context.compat = true;
