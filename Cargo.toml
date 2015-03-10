@@ -4,7 +4,7 @@ version = "0.0.1"
 authors = ["Nicolas Cherel"]
 
 [dependencies]
-rustc-serialize = "0.2"
-regex = "0.1"
+rustc-serialize = "0.3"
+regex = "=0.1.15"
 regex_macros = "=0.1.9"
 rustlex = "0.1"
