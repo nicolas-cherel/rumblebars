@@ -56,13 +56,17 @@ pub fn each_helper(params: &[&HBData], options: &HelperOptions, out: &mut SafeWr
     None => if let Some(keys) = use_context.keys() {
       if keys.len() > 0 {
         let mut r = Ok(());
-        for &key in keys.iter() {
+        for (index, &key) in keys.iter().enumerate() {
           if let Some(o) = options.context.get_key(key) {
             let key = key.to_string();
+            let first = (index == 0).to_json();
+            let last = (index == keys.len()-1).to_json();
 
             let mut each_globs = HashMap::new();
 
             each_globs.insert("@key", &key as &HBData);
+            each_globs.insert("@first", &first as &HBData);
+            each_globs.insert("@last", &last as &HBData);
 
             r = options.render_fn_with_context_and_globals(o, out, &each_globs);
 
