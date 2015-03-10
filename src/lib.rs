@@ -5,15 +5,12 @@
 #![feature(collections)]
 #![plugin(regex_macros)]
 #![plugin(rustlex)]
-
 #![feature(test)]
 
 extern crate regex;
 extern crate rustlex;
-
 extern crate "rustc-serialize" as serialize;
 
-#[cfg(test)]
 extern crate test;
 
 

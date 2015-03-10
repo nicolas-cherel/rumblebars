@@ -1026,6 +1026,7 @@ mod tests {
 
 #[cfg(test)]
 mod bench {
+
   use super::parse_hb_expression;
   use test::Bencher;
 
