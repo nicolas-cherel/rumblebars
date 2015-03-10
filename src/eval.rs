@@ -310,7 +310,7 @@ impl HBData for Json {
     match self {
       &Json::Object(ref o) => {
         let mut keys:Vec<_> = o.keys().map(|k| &k[..]).collect();
-        keys.sort_by(|&:a, b| a.cmp(b));
+        keys.sort_by(|a, b| a.cmp(b));
         Some(keys)
       },
       _ => None,
