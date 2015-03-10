@@ -1,11 +1,9 @@
 extern crate rumblebars;
 
-use rumblebars::parse;
+use rumblebars::Template;
 use rumblebars::ParseError;
 
-#[test]
-fn big_no_err() {
-  let t = parse(r##"
+static BIG: &'static str = r##"
     conten content
     {{pouet.so1}}
     {{#pouet2}} do do do {{/pouet2}}
@@ -28,11 +26,14 @@ fn big_no_err() {
     {{{toto2 coyote=speed.runner hello=how tip="top"}}}
     {{{toto3.[3].[#jojo] titi="grominet"}}}
     {{t "… param1" well.[that my baby].[1] ~}}
-  "##);
+  "##;
 
+
+#[test]
+fn big_no_err() {
+  let t = BIG.parse();
 
   assert!((match t { Ok(_) => true, Err((_, mesg)) => { println!("{}", mesg.unwrap_or("".to_string())); false }}))
-
 }
 
 #[test]
