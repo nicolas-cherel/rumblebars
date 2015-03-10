@@ -2,6 +2,7 @@ extern crate rumblebars;
 
 use rumblebars::Template;
 use rumblebars::ParseError;
+use rumblebars::parse;
 
 static BIG: &'static str = r##"
     conten content
@@ -31,7 +32,7 @@ static BIG: &'static str = r##"
 
 #[test]
 fn big_no_err() {
-  let t = BIG.parse();
+  let t = BIG.parse::<Template>();
 
   assert!((match t { Ok(_) => true, Err((_, mesg)) => { println!("{}", mesg.unwrap_or("".to_string())); false }}))
 }
