@@ -283,6 +283,7 @@ impl HBEntry {
 
 pub type Template = Vec<Box<HBEntry>>;
 
+#[derive(Debug)]
 pub enum ParseError {
   UnkownError, // unknown as ‘still not diagnosed’ case, not ’your grandma's TV is set on fire’ case
   InvalidExpression,
@@ -1019,5 +1020,104 @@ mod tests {
       }
       _ => "",
     });
+  }
+
+}
+
+#[cfg(test)]
+mod bench {
+  use super::parse_hb_expression;
+  use test::Bencher;
+
+  #[bench]
+  fn parse_simple_hb_exp(b: &mut Bencher) {
+    b.iter(|| {
+      parse_hb_expression("{{i}}").ok();
+    })
+  }
+
+
+  #[bench]
+  fn parse_hb_exp_1(b: &mut Bencher) {
+    b.iter(|| {
+      parse_hb_expression("{{i.j}}").ok();
+    })
+  }
+
+  #[bench]
+  fn parse_hb_exp_2(b: &mut Bencher) {
+    b.iter(|| {
+      parse_hb_expression("{{[i]}}").ok();
+    })
+  }
+
+  #[bench]
+  fn parse_hb_exp_3(b: &mut Bencher) {
+    b.iter(|| {
+      parse_hb_expression("{{.}}").ok();
+    })
+  }
+
+  #[bench]
+  fn parse_hb_exp_4(b: &mut Bencher) {
+    b.iter(|| {
+      parse_hb_expression("{{./p}}").ok();
+    })
+  }
+
+  #[bench]
+  fn parse_hb_exp_5(b: &mut Bencher) {
+    b.iter(|| {
+      parse_hb_expression(r##"{{p "string"}}"##).ok();
+    })
+  }
+
+  #[bench]
+  fn parse_hb_exp_6(b: &mut Bencher) {
+    b.iter(|| {
+      parse_hb_expression(r##"{{p some.path}}"##).ok();
+    })
+  }
+
+  #[bench]
+  fn parse_hb_exp_7(b: &mut Bencher) {
+    b.iter(|| {
+      parse_hb_expression(r##"{{p some path}}"##).ok();
+    })
+  }
+
+  #[bench]
+  fn parse_hb_exp_8(b: &mut Bencher) {
+    b.iter(|| {
+      parse_hb_expression(r##"{{p some.path "with_string" yep}}"##).ok();
+    })
+  }
+
+  #[bench]
+  fn parse_hb_exp_9(b: &mut Bencher) {
+    b.iter(|| {
+      parse_hb_expression(r##"{{t "… param1" well.[that my baby].[1] ~}}"##).ok();
+    })
+  }
+
+  #[bench]
+  fn parse_hb_exp_10(b: &mut Bencher) {
+    b.iter(|| {
+      parse_hb_expression(r##"{{t opt=u ~}}"##).ok();
+    })
+  }
+
+  #[bench]
+  fn parse_hb_exp_11(b: &mut Bencher) {
+    b.iter(|| {
+      parse_hb_expression(r##"{{t opt=u opt2="v" ~}}"##).ok();
+    })
+  }
+
+  #[bench]
+  fn parse_hb_exp_12(b: &mut Bencher) {
+    b.iter(|| {
+      parse_hb_expression(r##"{{t o.[t}+=] opt="v" ~}}"##).ok();
+    })
   }
 }
