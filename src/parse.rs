@@ -665,10 +665,7 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
           // (remove entries from stack and attach them to their parent )
 
           // check if it's a signle block or a block/else reduction
-          let has_else = match &stack[..] {
-            [_, (_, false), ( _, true)] => true,
-            _ => false,
-          };
+          let has_else = match stack.last() { Some(&(_, true)) => true, _ => false };
 
           // pop reduced content from stack
           let pop = if has_else {

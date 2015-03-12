@@ -38,6 +38,30 @@ fn big_no_err() {
 }
 
 #[test]
+fn medium() {
+  let t = r##"<h1>RumbleBars commits</h1>
+
+<ul>
+{{#each}}
+  <li>
+    <div class="head">
+      {{#if commit}}<div>{{commit.message}}</div>{{/if}}
+      {{#if commit.author}}
+        <div>{{commit.author.name}} — <span>{{sha}}</span></div>
+        <div>{{commit.author.date}}</div>
+      {{else}}
+        -- no author --
+      {{/if}}
+    </div>
+  </li>
+{{/each}}
+</ul>
+"##.parse::<Template>();
+
+  assert!((match t { Ok(_) => true, Err((_, mesg)) => { println!("{}", mesg.unwrap_or("".to_string())); false }}))
+}
+
+#[test]
 fn fail_block() {
   assert!(match parse("{{#o}}{{/t}}") { Err((ParseError::UnmatchedBlock, _)) => true, Err(_) => false, Ok(_) => false })
 }
