@@ -102,21 +102,20 @@ impl <'a> Writer for IndentWriter<'a> {
     match self.indent {
       None => self.w.write_all(buf),
       Some(ref indent_str) => {
-        let nl = "\n".as_bytes()[0];
-
         let mut r = Ok(());
-        for c in buf.iter() {
+        let ref mut writer = self.w;
+        for c in unsafe { ::std::str::from_utf8_unchecked(buf).chars() } {
           r = match c {
-            &chr if chr == nl => {
-              r = self.w.write_u8(chr);
+            '\n'  => {
+              r = writer.write_char(c);
               if r.is_ok() {
-                self.w.write_str(&indent_str)
+                writer.write_str(&indent_str)
               } else {
                 r
               }
             },
-            &chr => {
-              self.w.write_u8(chr)
+            chr => {
+              writer.write_char(chr)
             }
           };
 
@@ -179,26 +178,25 @@ impl <'a> HTMLSafeWriter<'a> {
 impl <'a> Writer for HTMLSafeWriter<'a> {
   fn write_all(&mut self, buf: &[u8]) -> Result<(), IoError> {
     let mut r = Ok(());
-    if let Ok(_str) = ::std::str::from_utf8(buf) {
-      let writer = self.writer();
-      for c in _str.chars() {
-        r = match c {
-          '<'  => writer.write_str("&lt;"),
-          '>'  => writer.write_str("&gt;"),
-          '&'  => writer.write_str("&amp;"),
-          '"'  => writer.write_str("&quot;"),
-          '\'' => writer.write_str("&#x27;"),
-          '`'  => writer.write_str("&#x60;"),
-          '\\' => writer.write_str("\\"),
 
-          chr => {
-            writer.write_char(chr)
-          }
-        };
+    let writer = self.writer();
+    for c in unsafe { ::std::str::from_utf8_unchecked(buf).chars() } {
+      r = match c {
+        '<'  => writer.write_str("&lt;"),
+        '>'  => writer.write_str("&gt;"),
+        '&'  => writer.write_str("&amp;"),
+        '"'  => writer.write_str("&quot;"),
+        '\'' => writer.write_str("&#x27;"),
+        '`'  => writer.write_str("&#x60;"),
+        '\\' => writer.write_str("\\"),
 
-        if r.is_err() {
-          break;
+        chr => {
+          writer.write_char(chr)
         }
+      };
+
+      if r.is_err() {
+        break;
       }
     }
 
