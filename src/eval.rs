@@ -104,10 +104,14 @@ impl <'a> Writer for IndentWriter<'a> {
       Some(ref indent_str) => {
         let mut r = Ok(());
         let ref mut writer = self.w;
-        for c in unsafe { ::std::str::from_utf8_unchecked(buf).chars() } {
-          r = match c {
-            '\n'  => {
-              r = writer.write_char(c);
+        let as_utf8 = unsafe { ::std::str::from_utf8_unchecked(buf) };
+        let mut i = 0usize;
+        while i < as_utf8.len() {
+          let ::std::str::CharRange {ch: _, next} = as_utf8.char_range_at(i);
+
+          r = match &as_utf8[i..next] {
+            "\n"  => {
+              r = writer.write_str("\n");
               if r.is_ok() {
                 writer.write_str(&indent_str)
               } else {
@@ -115,9 +119,11 @@ impl <'a> Writer for IndentWriter<'a> {
               }
             },
             chr => {
-              writer.write_char(chr)
+              writer.write_str(chr)
             }
           };
+
+          i = next;
 
           if r.is_err() {
             break;
@@ -180,21 +186,25 @@ impl <'a> Writer for HTMLSafeWriter<'a> {
     let mut r = Ok(());
 
     let writer = self.writer();
-    for c in unsafe { ::std::str::from_utf8_unchecked(buf).chars() } {
-      r = match c {
-        '<'  => writer.write_str("&lt;"),
-        '>'  => writer.write_str("&gt;"),
-        '&'  => writer.write_str("&amp;"),
-        '"'  => writer.write_str("&quot;"),
-        '\'' => writer.write_str("&#x27;"),
-        '`'  => writer.write_str("&#x60;"),
-        '\\' => writer.write_str("\\"),
 
-        chr => {
-          writer.write_char(chr)
+    let as_utf8 = unsafe { ::std::str::from_utf8_unchecked(buf) };
+    let mut i = 0usize;
+    while i < as_utf8.len() {
+      let ::std::str::CharRange {ch: _, next} = as_utf8.char_range_at(i);
+      r = match &as_utf8[i..next] {
+        "<"  => writer.write_str("&lt;"),
+        ">"  => writer.write_str("&gt;"),
+        "&"  => writer.write_str("&amp;"),
+        "\"" => writer.write_str("&quot;"),
+        "\'" => writer.write_str("&#x27;"),
+        "`"  => writer.write_str("&#x60;"),
+        "\\" => writer.write_str("\\"),
+
+        c => {
+          writer.write_str(c)
         }
       };
-
+      i = next;
       if r.is_err() {
         break;
       }
