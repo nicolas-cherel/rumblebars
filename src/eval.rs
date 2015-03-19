@@ -189,33 +189,22 @@ impl <'a> Writer for HTMLSafeWriter<'a> {
 
     let as_utf8 = unsafe { ::std::str::from_utf8_unchecked(buf) };
     let mut i = 0usize;
-    let matches: &[_] = &['<', '>', '&', '\"', '\'', '`', '\\'];
-
-
+    let mut i = 0usize;
     while i < as_utf8.len() {
-      let searched = &as_utf8[i..as_utf8.len()];
-      r = match searched.find(matches) {
-        None => {
-          i = as_utf8.len();
-          writer.write_str(searched)
-        },
-        Some(index) => {
-          let ::std::str::CharRange {ch, next} = searched.char_range_at(index);
-          i = i + next;
-          writer.write_str(&searched[0..index]).and_then(|_| {
-            writer.write_str(match ch {
-              '<'  => "&lt;",
-              '>'  => "&gt;",
-              '&'  => "&amp;",
-              '\"' => "&quot;",
-              '\'' => "&#x27;",
-              '`'  => "&#x60;",
-              '\\' => "\\",
-              _ => "",
-            })
-          })
-        }
+      let ::std::str::CharRange {ch: _, next} = as_utf8.char_range_at(i);
+
+      r = match &as_utf8[i..next] {
+        "<"  => writer.write_str("&lt;"),
+        ">"  => writer.write_str("&gt;"),
+        "&"  => writer.write_str("&amp;"),
+        "\"" => writer.write_str("&quot;"),
+        "\'" => writer.write_str("&#x27;"),
+        "`"  => writer.write_str("&#x60;"),
+        "\\" => writer.write_str("\\"),
+        chr  => writer.write_str(chr),
       };
+
+      i = next;
 
       if r.is_err() {
         break;
