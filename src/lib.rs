@@ -7,6 +7,9 @@
 #![plugin(rustlex)]
 #![feature(test)]
 
+// for rustlex
+#![feature(box_syntax)]
+
 extern crate regex;
 extern crate rustlex;
 extern crate "rustc-serialize" as serialize;

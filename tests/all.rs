@@ -137,6 +137,7 @@ mod eval {
     eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
     assert_eq!(String::from_utf8(buf).unwrap(), "found this data and yep, was found i yep, was found j yep, was found k ");
+
   }
 
   #[test]
@@ -341,6 +342,7 @@ mod eval {
       let expected = "\n        3)\n        i\n          o\n\n\n              "; // one line string due to trailing whitespace
       assert_eq!(String::from_utf8(buf).unwrap(), expected);
     }
+
   }
 
 

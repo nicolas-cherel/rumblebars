@@ -16,7 +16,7 @@ fn test_set(set_name: &str) {
         Ok(ref mut reader) => {
           match reader.read_to_end() {
             Ok(buf_json) => {
-              let json_test = Json::from_str(&String::from_utf8(buf_json).ok().unwrap()).ok().unwrap_or_else(|&:| panic!("cannot parse json for tests"));
+              let json_test = Json::from_str(&String::from_utf8(buf_json).ok().unwrap()).ok().unwrap_or_else(|| panic!("cannot parse json for tests"));
               let null = Json::Null;
               let mut errors = Vec::new();
               if let Some(tests) = json_test.find("tests") {

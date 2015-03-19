@@ -6,7 +6,7 @@ use self::Token::{TokSimpleExp, TokNoEscapeExp, TokCommentExp, TokBlockExp, TokB
 use self::HBToken::{TokPathEntry,TokNoWhiteSpaceBefore, TokNoWhiteSpaceAfter,TokStringParam,TokParamStart, TokParamSep, TokOption, TokLeadingWhiteSpace, TokTrailingWhiteSpace};
 
 #[derive(Debug)]
-enum Token {
+pub enum Token {
   // base template tokens
   TokSimpleExp(String),
   TokNoEscapeExp(String),
@@ -19,7 +19,7 @@ enum Token {
 }
 
 #[derive(Debug)]
-enum HBToken {
+pub enum HBToken {
   TokPathEntry(String),
   TokNoWhiteSpaceBefore,
   TokNoWhiteSpaceAfter,
