@@ -1,7 +1,7 @@
 
 use std::old_path::posix::Path;
 use std::old_path::GenericPath;
-use std::old_io::{fs, FileStat, FileType};
+use std::old_io::{fs, FileStat, FileType, Reader};
 use std::default::Default;
 
 use serialize::json::Json;

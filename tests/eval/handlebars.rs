@@ -1,6 +1,5 @@
 
 use std::default::Default;
-
 use serialize::json::Json;
 
 use rumblebars::HBData;
@@ -21,6 +20,7 @@ macro_rules! equals_expected(
 );
 
 mod helpers {
+  use std::io::Write;
 
   use rumblebars::HelperOptions;
   use rumblebars::HBData;

@@ -1,11 +1,12 @@
 #![crate_name="rumblebars"]
 #![feature(plugin)]
-#![feature(old_io)]
 #![feature(std_misc)]
 #![feature(collections)]
 #![plugin(regex_macros)]
 #![plugin(rustlex)]
 #![feature(test)]
+
+#![feature(str_char)]
 
 // for rustlex
 #![feature(box_syntax)]

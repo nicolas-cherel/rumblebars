@@ -1,7 +1,7 @@
-use std::old_io::{IoError, Writer};
+use std::io;
+use std::io::Write;
 use serialize::json::Json;
 use std::collections::HashMap;
-use std::slice::SliceExt;
 use std::num::Float;
 use std::vec::Vec;
 use std::default::Default;
@@ -90,19 +90,20 @@ struct IndentWriter<'a> {
 }
 
 impl <'a> IndentWriter<'a> {
-  fn with_indent(s: Option<String>, out: &mut SafeWriting, funkt: &Fn(&mut SafeWriting) -> Result<(), IoError>) -> Result<(), IoError> {
+  fn with_indent(s: Option<String>, out: &mut SafeWriting, funkt: &Fn(&mut SafeWriting) -> io::Result<()>) -> io::Result<()> {
     let mut indenter = IndentWriter {w: unsafe { ::std::mem::transmute(out) }, indent: s};
     let mut safe = SafeWriting::Unsafe(&mut indenter);
     funkt(&mut safe)
   }
 }
 
-impl <'a> Writer for IndentWriter<'a> {
-  fn write_all(&mut self, buf: &[u8]) -> Result<(), IoError> {
+
+impl <'a> io::Write for IndentWriter<'a> {
+  fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
     match self.indent {
-      None => self.w.write_all(buf),
+      None => self.w.write(buf),
       Some(ref indent_str) => {
-        let mut r = Ok(());
+        let mut r = Ok(0);
         let ref mut writer = self.w;
         let as_utf8 = unsafe { ::std::str::from_utf8_unchecked(buf) };
         let mut i = 0usize;
@@ -111,17 +112,15 @@ impl <'a> Writer for IndentWriter<'a> {
 
           r = match &as_utf8[i..next] {
             "\n"  => {
-              r = writer.write_str("\n");
-              if r.is_ok() {
-                writer.write_str(&indent_str)
-              } else {
-                r
-              }
+              writer.write("\n".as_bytes()).and_then(|_| {
+                writer.write(&indent_str.as_bytes())
+              })
             },
             chr => {
-              writer.write_str(chr)
+              writer.write(chr.as_bytes())
             }
           };
+
 
           i = next;
 
@@ -130,15 +129,19 @@ impl <'a> Writer for IndentWriter<'a> {
           }
         }
 
-        r
+        r.and(Ok(buf.len()))
       },
     }
+  }
+
+  fn flush(&mut self) -> io::Result<()> {
+    self.w.flush()
   }
 }
 
 pub enum SafeWriting<'a> {
   Safe(&'a mut (SafeWriter +'a)),
-  Unsafe(&'a mut (Writer +'a)),
+  Unsafe(&'a mut (io::Write +'a)),
 }
 
 impl <'a> SafeWriting<'a> {
@@ -149,59 +152,63 @@ impl <'a> SafeWriting<'a> {
     }
   }
 
-  pub fn with_html_safe_writer(out: &mut Writer, safe: &Fn(&mut SafeWriting) -> HBEvalResult) -> HBEvalResult {
+  pub fn with_html_safe_writer(out: &mut io::Write, safe: &Fn(&mut SafeWriting) -> HBEvalResult) -> HBEvalResult {
     let mut html_safe = HTMLSafeWriter::new(out);
     safe(&mut SafeWriting::Safe(&mut html_safe))
   }
 }
 
-impl <'a> Writer for SafeWriting<'a> {
-  fn write_all(&mut self, buf: &[u8]) -> Result<(), IoError> {
+impl <'a> io::Write for SafeWriting<'a> {
+  fn write(&mut self, buf: &[u8]) -> io::Result<(usize)> {
     match self {
-      &mut SafeWriting::Safe(ref mut w)  => w.write_all(buf),
-      &mut SafeWriting::Unsafe(ref mut w) => w.write_all(buf),
+      &mut SafeWriting::Safe(ref mut w)  => w.write(buf),
+      &mut SafeWriting::Unsafe(ref mut w) => w.write(buf),
+    }
+  }
+
+  fn flush(&mut self) -> io::Result<()> {
+    match self {
+      &mut SafeWriting::Safe(ref mut w)  => w.flush(),
+      &mut SafeWriting::Unsafe(ref mut w) => w.flush(),
     }
   }
 }
 
-pub trait SafeWriter: Writer {
-  fn writer(&mut self) -> &mut Writer;
+pub trait SafeWriter: io::Write {
+  fn writer(&mut self) -> &mut io::Write;
 }
 
 
 pub struct HTMLSafeWriter<'a> {
-  w: &'a mut (Writer + 'a)
+  w: &'a mut (io::Write + 'a)
 }
 
 impl <'a> HTMLSafeWriter<'a> {
-  fn new(writer: &'a mut (Writer + 'a)) -> HTMLSafeWriter {
+  fn new(writer: &'a mut (io::Write + 'a)) -> HTMLSafeWriter {
     HTMLSafeWriter {
       w: writer
     }
   }
 }
 
-impl <'a> Writer for HTMLSafeWriter<'a> {
-  fn write_all(&mut self, buf: &[u8]) -> Result<(), IoError> {
-    let mut r = Ok(());
-
+impl <'a> io::Write for HTMLSafeWriter<'a> {
+  fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+    let mut r = Ok(0);
     let writer = self.writer();
 
     let as_utf8 = unsafe { ::std::str::from_utf8_unchecked(buf) };
     let mut i = 0usize;
-    let mut i = 0usize;
     while i < as_utf8.len() {
       let ::std::str::CharRange {ch: _, next} = as_utf8.char_range_at(i);
-
       r = match &as_utf8[i..next] {
-        "<"  => writer.write_str("&lt;"),
-        ">"  => writer.write_str("&gt;"),
-        "&"  => writer.write_str("&amp;"),
-        "\"" => writer.write_str("&quot;"),
-        "\'" => writer.write_str("&#x27;"),
-        "`"  => writer.write_str("&#x60;"),
-        "\\" => writer.write_str("\\"),
-        chr  => writer.write_str(chr),
+        "<"  => writer.write("&lt;".as_bytes()),
+        ">"  => writer.write("&gt;".as_bytes()),
+        "&"  => writer.write("&amp;".as_bytes()),
+        "\"" => writer.write("&quot;".as_bytes()),
+        "\'" => writer.write("&#x27;".as_bytes()),
+        "`"  => writer.write("&#x60;".as_bytes()),
+        "\\" => writer.write("\\".as_bytes()),
+        chr  => writer.write(chr.as_bytes()),
       };
 
       i = next;
@@ -210,18 +217,21 @@ impl <'a> Writer for HTMLSafeWriter<'a> {
         break;
       }
     }
+    r.and(Ok(buf.len()))
+  }
 
-    r
+  fn flush(&mut self) -> io::Result<()> {
+    self.writer().flush()
   }
 }
 
 impl <'a> SafeWriter for HTMLSafeWriter<'a> {
-  fn writer(&mut self) -> &mut Writer {
+  fn writer(&mut self) -> &mut io::Write {
     self.w
   }
 }
 
-pub type HBEvalResult = Result<(), IoError>;
+pub type HBEvalResult = io::Result<()>;
 
 pub trait HBData  {
   fn write_value(&self, out: &mut SafeWriting) -> HBEvalResult;
@@ -656,7 +666,7 @@ impl EvalContext {
   }
 }
 
-pub fn eval(template: &Template, data: &HBData, out: &mut Writer, eval_context: &EvalContext) -> HBEvalResult {
+pub fn eval(template: &Template, data: &HBData, out: &mut io::Write, eval_context: &EvalContext) -> HBEvalResult {
   let log = "info".to_string();
   let mut globals = HashMap::new();
   globals.insert("@root", data);
@@ -695,7 +705,7 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
       match ***templ {
         HBEntry::Raw(ref s) => {
           IndentWriter::with_indent(indent.clone(), &mut out.into_unsafe(), &|w| {
-            w.write_str(&s)
+            w.write_all(&s.as_bytes())
           })
         },
         HBEntry::Partial(ref exp) => {

@@ -1,5 +1,4 @@
-
-use std::old_io::BufReader;
+use std::io::BufReader;
 use serialize::json::Json;
 
 use self::Token::{TokSimpleExp, TokNoEscapeExp, TokCommentExp, TokBlockExp, TokBlockElseCond, TokBlockEndExp, TokPartialExp, TokRaw};

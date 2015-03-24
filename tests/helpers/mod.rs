@@ -3,6 +3,7 @@ extern crate "rustc-serialize" as serialize;
 
 use serialize::json::Json;
 use std::default::Default;
+use std::io::Write;
 use std::collections::HashMap;
 
 use rumblebars::eval;
