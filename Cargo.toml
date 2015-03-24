@@ -7,4 +7,10 @@ authors = ["Nicolas Cherel"]
 rustc-serialize = "0.3"
 regex = "0.1"
 regex_macros = "0.1"
-rustlex = "0.1"
+# rustlex = "0.2"
+
+# for dev cycles
+[dependencies.rustlex]
+# path = "../rustlex"
+git = "https://github.com/nicolas-cherel/rustlex"
+branch = "rumblebars-compat"
