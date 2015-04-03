@@ -66,7 +66,7 @@ let tmpl = parse(r##"{{example_helper}}"##).ok().unwrap();
 let mut eval_ctxt: EvalContext = Default::default();
 let mut buf = Vec::<u8>::new();
 
-eval_ctxt.register_helper("example_helper".to_string(), Helper::new_with_function(example_helper));
+eval_ctxt.register_helper("example_helper".to_string(), example_helper);
 
 eval(&tmpl, &json, &mut buf, &eval_ctxt).ok();
 
