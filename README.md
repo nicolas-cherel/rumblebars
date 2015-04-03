@@ -1,5 +1,6 @@
-# rumblebars — a handlebars template evaluation library
--
+[![Build Status](https://travis-ci.org/nicolas-cherel/rumblebars.svg?branch=master)](https://travis-ci.org/nicolas-cherel/rumblebars)
+
+# rumblebars — a handlebars template expansion library
 
 Rumblebars passes **all mustaches specs** [[1]](#1) and **272 handlebars tests** [[2]](#2). Template evaluation is rendered to a `io::Writer`, so that you can choose wether if you hold result in memory or not. It also input data angostic, given that your data structure implements the `HBData` trait (Json implementation provided).
 
