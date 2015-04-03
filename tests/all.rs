@@ -1,8 +1,9 @@
+#![feature(slice_patterns)]
 #![feature(old_path)]
 #![feature(old_io)]
 
 extern crate rumblebars;
-extern crate "rustc-serialize" as serialize;
+extern crate rustc_serialize as serialize;
 
 mod helpers;
 mod parse;

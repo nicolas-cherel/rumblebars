@@ -1,5 +1,3 @@
-extern crate rumblebars;
-extern crate "rustc-serialize" as serialize;
 
 use serialize::json::Json;
 use std::default::Default;

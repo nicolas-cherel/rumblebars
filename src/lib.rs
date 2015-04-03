@@ -1,6 +1,7 @@
 #![crate_name="rumblebars"]
 #![feature(plugin)]
-#![feature(std_misc)]
+#![feature(slice_patterns)]
+#![feature(core)] // for rustlext
 #![feature(collections)]
 #![plugin(regex_macros)]
 #![plugin(rustlex)]
@@ -8,12 +9,9 @@
 
 #![feature(str_char)]
 
-// for rustlex
-#![feature(box_syntax)]
-
 extern crate regex;
 extern crate rustlex;
-extern crate "rustc-serialize" as serialize;
+extern crate rustc_serialize as serialize;
 
 extern crate test;
 
