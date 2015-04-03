@@ -249,8 +249,8 @@ pub struct HBExpression {
   pub params: Vec<HBValHolder>,
   pub options: Vec<(String, HBValHolder)>,
   pub render_options: RenderOptions,
-  pub block: Option<Box<Template>>,
-  pub else_block: Option<Box<Template>>,
+  pub block: Option<Box<Entries>>,
+  pub else_block: Option<Box<Entries>>,
 }
 
 impl HBExpression {
@@ -280,7 +280,17 @@ impl HBEntry {
   }
 }
 
-pub type Template = Vec<Box<HBEntry>>;
+pub type Entries = Vec<Box<HBEntry>>;
+
+pub struct Template {
+  pub entries: Entries
+}
+
+impl ::std::default::Default for Template {
+  fn default() -> Template {
+    Template { entries: ::std::default::Default::default() }
+  }
+}
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -412,7 +422,7 @@ enum Unit {
 }
 
 // append entry to stack but if entry is raw data, append it to last raw entry
-fn append_entry(stack: &mut Vec<(Box<Template>, bool)>, e: Box<HBEntry>) {
+fn append_entry(stack: &mut Vec<(Box<Entries>, bool)>, e: Box<HBEntry>) {
   let may_push_entry = match (stack.last_mut(), &*e) {
     (Some(&mut(ref mut block, _)), &HBEntry::Raw(ref s)) => {
       if let Some(ref mut boxed) = (***block).last_mut() {
@@ -730,7 +740,7 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
   };
 
   if stack.len() > 0 {
-    Result::Ok(*stack.remove(0).0)
+    Result::Ok(Template { entries: *stack.remove(0).0 })
   } else {
     Result::Err((ParseError::UnkownError, None))
   }
@@ -927,7 +937,7 @@ mod tests {
   #[test]
   fn parse_raw() {
     let p = parse("tada").unwrap_or(Default::default());
-    assert_eq!("tada", match p.get(0) {
+    assert_eq!("tada", match p.entries.get(0) {
       Some(& ref boxed_entry) => {
         match **boxed_entry {
           HBEntry::Raw(ref s) => &s[..],
@@ -941,7 +951,7 @@ mod tests {
   #[test]
   fn parse_exp() {
     let p = parse("{{tada}}").unwrap_or(Default::default());
-    assert_eq!("tada", match p.get(0) {
+    assert_eq!("tada", match p.entries.get(0) {
       Some(& ref boxed_entry) => {
         match **boxed_entry {
           HBEntry::Eval(HBExpression {ref base, ..}) => &base.iter().next().unwrap()[..],
@@ -956,7 +966,7 @@ mod tests {
   #[test]
   fn parse_else_block() {
     let p = parse("{{#tada}}i{{else}}o{{/tada}}").unwrap_or(Default::default());;
-    assert_eq!(true, match p.get(0) {
+    assert_eq!(true, match p.entries.get(0) {
       Some(& ref boxed_entry) => {
         match **boxed_entry {
           HBEntry::Eval(HBExpression {ref base, ref params, ref options, ref render_options, ref block, ref else_block}) => match (block, else_block) { (&Some(_), &Some(_)) => true, _ => false },
@@ -971,7 +981,7 @@ mod tests {
   #[test]
   fn parse_exp_entangled() {
     let p = parse("tidi {{tada}} todo {{tudu}} bar").unwrap_or(Default::default());
-    assert_eq!("tidi ", match p.get(0) {
+    assert_eq!("tidi ", match p.entries.get(0) {
       Some(& ref boxed_entry) => {
         match **boxed_entry {
           HBEntry::Raw(ref s) => &s[..],
@@ -980,7 +990,7 @@ mod tests {
       }
       _ => "",
     });
-    assert_eq!("tada", match p.get(1) {
+    assert_eq!("tada", match p.entries.get(1) {
       Some(& ref boxed_entry) => {
         match **boxed_entry {
           HBEntry::Eval(HBExpression {ref base, ..}) => &base.iter().next().unwrap()[..],
@@ -989,7 +999,7 @@ mod tests {
       }
       _ => "",
     });
-    assert_eq!(" todo ", match p.get(2) {
+    assert_eq!(" todo ", match p.entries.get(2) {
       Some(& ref boxed_entry) => {
         match **boxed_entry {
           HBEntry::Raw(ref s) => &s[..],
@@ -998,7 +1008,7 @@ mod tests {
       }
       _ => "",
     });
-    assert_eq!("tudu", match p.get(3) {
+    assert_eq!("tudu", match p.entries.get(3) {
       Some(& ref boxed_entry) => {
         match **boxed_entry {
           HBEntry::Eval(HBExpression {ref base, ..}) => &base.iter().next().unwrap()[..],
@@ -1007,7 +1017,7 @@ mod tests {
       }
       _ => "",
     });
-    assert_eq!(" bar", match p.get(4) {
+    assert_eq!(" bar", match p.entries.get(4) {
       Some(& ref boxed_entry) => {
         match **boxed_entry {
           HBEntry::Raw(ref s) => &s[..],

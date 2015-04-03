@@ -2,15 +2,16 @@ use std::io;
 use std::io::Write;
 use serialize::json::Json;
 use std::collections::HashMap;
-use std::num::Float;
 use std::vec::Vec;
 use std::default::Default;
 use regex::Regex;
 
 use parse::Template;
+use parse::Entries;
 use parse::HBEntry;
 use parse::HBExpression;
 use parse::HBValHolder;
+
 
 fn value_for_key_path_in_context<'a>(
   data: &'a HBData,
@@ -406,8 +407,8 @@ pub type HelperOptionsByName<'a> = HashMap<&'a String, &'a (HBData + 'a)>;
 // alow dead, only used from user defined helpers
 #[allow(dead_code)]
 pub struct HelperOptions<'a> {
-  block: Option<&'a Template>,
-  inverse: Option<&'a Template>,
+  block: Option<&'a Entries>,
+  inverse: Option<&'a Entries>,
   pub context: &'a (HBData + 'a),
   hb_context: &'a EvalContext,
   pub condition: bool,
@@ -442,7 +443,7 @@ impl <'a> HelperOptions<'a> {
     r
   }
 
-  fn render_template(&self, template: Option<&'a Template>, data: &'a HBData, out: &mut SafeWriting) -> HBEvalResult {
+  fn render_template(&self, template: Option<&'a Entries>, data: &'a HBData, out: &mut SafeWriting) -> HBEvalResult {
     match template {
       Some(t) => eval_with_globals(t, data, out, self.hb_context, self.global_data, self.context_stack, None),
       None => Ok(()),
@@ -545,8 +546,8 @@ impl Helper {
 
   fn call_for_block<'a, 'b, 'c>(
     &self,
-    block: Option<&'a Template>,
-    inverse: Option<&'a Template>,
+    block: Option<&'a Entries>,
+    inverse: Option<&'a Entries>,
     inverse_condition: bool,
     context: &'a HBData,
     params: &'a [HBValHolder],
@@ -675,10 +676,10 @@ pub fn eval(template: &Template, data: &HBData, out: &mut io::Write, eval_contex
   let mut html_safe = HTMLSafeWriter::new(out);
   let mut safe_writer = SafeWriting::Safe(&mut html_safe);
 
-  eval_with_globals(template, data, &mut safe_writer, eval_context, &globals, &vec![data], None)
+  eval_with_globals(&template.entries, data, &mut safe_writer, eval_context, &globals, &vec![data], None)
 }
 
-pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a HBData, out: &mut SafeWriting, eval_context: &'a EvalContext, global_data: &HashMap<&str, &'c HBData>, context_stack: &Vec<&'b HBData>, indent: Option<String>) -> HBEvalResult {
+pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(entries: &'a Entries, data: &'a HBData, out: &mut SafeWriting, eval_context: &'a EvalContext, global_data: &HashMap<&str, &'c HBData>, context_stack: &Vec<&'b HBData>, indent: Option<String>) -> HBEvalResult {
 
   // evaluation is done by iterating through each HBEntry to evaluate
   //  - raw copy,
@@ -692,7 +693,7 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
   //  - a ref to their associated context
   //  - a context stack, to have access of context of parent blocks (copied for each entry)
   //  - an indentation level (for partials, copied for each entry)
-  let mut stack:Vec<_> = template.iter().rev().map(|e| {
+  let mut stack:Vec<_> = entries.iter().rev().map(|e| {
     (e, data, context_stack.iter().map(|s| *s).collect::<Vec<_>>(), indent.clone())
   }).collect();
 
@@ -749,7 +750,7 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(template: &'a Template, data: &'a H
                     (&None, &None) => None,
                   };
 
-                  for e in t.iter().rev() {
+                  for e in t.entries.iter().rev() {
                     let mut c_stack = ctxt_stack.clone();
                     c_stack.push(*ctxt);
                     stack.push((e, with_options_fallback.unwrap_or(c_ctxt), c_stack, may_indent.clone()));

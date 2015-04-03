@@ -71,7 +71,7 @@ fn test_handlebars(data: &str) {
   match partials {
     &Json::Object(ref o) => {
       for (key, partial) in o.iter() {
-        eval_context.register_partial(key.clone(), ::rumblebars::parse(partial.as_string().unwrap_or("")).ok().unwrap_or(vec![]));
+        eval_context.register_partial(key.clone(), ::rumblebars::parse(partial.as_string().unwrap_or("")).ok().unwrap_or(Default::default()));
       }
     },
     _ => (),
