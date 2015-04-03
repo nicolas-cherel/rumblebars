@@ -31,48 +31,48 @@ pub enum HBToken {
 }
 
 rustlex! HandleBarsLexer {
-    // expression definitions
+  // expression definitions
 
-    let OPEN  = "{{" '~'?;
-    let CLOSE = [' ''\t']* '~'? "}}";
-    let EXP = ('}'?[^'}'])*;
+  let OPEN  = "{{" '~'?;
+  let CLOSE = [' ''\t']* '~'? "}}";
+  let EXP = ('}'?[^'}'])*;
 
-    let NEW_LINE     = (['\n'] | ['\r']['\n']);
-    let IGN_WP        = [' ''\t''\r']*;
-    let ALL_WP        = (NEW_LINE | IGN_WP)*;
-    let PASS_THROUGH  = ALL_WP* ('{'?[^'{'' ''\t''\r''\n''\\'])*;
-    let PASS_ESC      = '\\';
-    let ESCAPED_EXP   = '\\' '{';
-    let ESCAPED_ESC   = '\\' '\\';
-    let ESCAPED_SKIP  = '\\' '\\'? [^'{''\\''\r''\n'];
+  let NEW_LINE     = (['\n'] | ['\r']['\n']);
+  let IGN_WP        = [' ''\t''\r']*;
+  let ALL_WP        = (NEW_LINE | IGN_WP)*;
+  let PASS_THROUGH  = ALL_WP* ('{'?[^'{'' ''\t''\r''\n''\\'])*;
+  let PASS_ESC      = '\\';
+  let ESCAPED_EXP   = '\\' '{';
+  let ESCAPED_ESC   = '\\' '\\';
+  let ESCAPED_SKIP  = '\\' '\\'? [^'{''\\''\r''\n'];
 
-    let BLOCK_EXP     = ALL_WP OPEN '#' EXP CLOSE ALL_WP;
-    let BLOCK_INV_EXP = ALL_WP OPEN '^' EXP CLOSE ALL_WP;
-    let END_EXP       = ALL_WP OPEN '/' EXP CLOSE   ALL_WP;
-    let NO_ESC_EXP    = ALL_WP OPEN ('{' EXP '}' | '&' EXP) CLOSE ALL_WP;
-    let PARTIAL_EXP   = ALL_WP OPEN '>' EXP CLOSE ALL_WP;
-    let SIMPLE_EXP    = ALL_WP OPEN [^'!'] EXP CLOSE ALL_WP;
-    let ELSE_EXP      = ALL_WP OPEN (IGN_WP "else" IGN_WP | '^') CLOSE ALL_WP;
+  let BLOCK_EXP     = ALL_WP OPEN '#' EXP CLOSE ALL_WP;
+  let BLOCK_INV_EXP = ALL_WP OPEN '^' EXP CLOSE ALL_WP;
+  let END_EXP       = ALL_WP OPEN '/' EXP CLOSE   ALL_WP;
+  let NO_ESC_EXP    = ALL_WP OPEN ('{' EXP '}' | '&' EXP) CLOSE ALL_WP;
+  let PARTIAL_EXP   = ALL_WP OPEN '>' EXP CLOSE ALL_WP;
+  let SIMPLE_EXP    = ALL_WP OPEN [^'!'] EXP CLOSE ALL_WP;
+  let ELSE_EXP      = ALL_WP OPEN (IGN_WP "else" IGN_WP | '^') CLOSE ALL_WP;
 
-    let COMMENT_EXP   = ALL_WP OPEN '!' EXP CLOSE ALL_WP;
+  let COMMENT_EXP   = ALL_WP OPEN '!' EXP CLOSE ALL_WP;
 
-    // then rules
-    PASS_THROUGH      => |lexer:&mut HandleBarsLexer<R>| Some( TokRaw( lexer.yystr() ) )
+  // then rules
+  PASS_THROUGH      => |lexer:&mut HandleBarsLexer<R>| { Some( TokRaw( lexer.yystr() ) ) }
 
-    SIMPLE_EXP        => |lexer:&mut HandleBarsLexer<R>| Some( TokSimpleExp(     lexer.yystr() ) )
-    NO_ESC_EXP        => |lexer:&mut HandleBarsLexer<R>| Some( TokNoEscapeExp(   lexer.yystr() ) )
-    PARTIAL_EXP       => |lexer:&mut HandleBarsLexer<R>| Some( TokPartialExp(    lexer.yystr() ) )
-    END_EXP           => |lexer:&mut HandleBarsLexer<R>| Some( TokBlockEndExp(   lexer.yystr() ) )
-    BLOCK_EXP         => |lexer:&mut HandleBarsLexer<R>| Some( TokBlockExp(      lexer.yystr(), false ) )
-    BLOCK_INV_EXP     => |lexer:&mut HandleBarsLexer<R>| Some( TokBlockExp(      lexer.yystr(), true  ) )
-    ELSE_EXP          => |lexer:&mut HandleBarsLexer<R>| Some( TokBlockElseCond( lexer.yystr() ) )
+  SIMPLE_EXP        => |lexer:&mut HandleBarsLexer<R>| { Some( TokSimpleExp(     lexer.yystr() ) ) }
+  NO_ESC_EXP        => |lexer:&mut HandleBarsLexer<R>| { Some( TokNoEscapeExp(   lexer.yystr() ) ) }
+  PARTIAL_EXP       => |lexer:&mut HandleBarsLexer<R>| { Some( TokPartialExp(    lexer.yystr() ) ) }
+  END_EXP           => |lexer:&mut HandleBarsLexer<R>| { Some( TokBlockEndExp(   lexer.yystr() ) ) }
+  BLOCK_EXP         => |lexer:&mut HandleBarsLexer<R>| { Some( TokBlockExp(      lexer.yystr(), false ) ) }
+  BLOCK_INV_EXP     => |lexer:&mut HandleBarsLexer<R>| { Some( TokBlockExp(      lexer.yystr(), true  ) ) }
+  ELSE_EXP          => |lexer:&mut HandleBarsLexer<R>| { Some( TokBlockElseCond( lexer.yystr() ) ) }
 
-    COMMENT_EXP       => |lexer:&mut HandleBarsLexer<R>| Some( TokCommentExp(    lexer.yystr() ) )
+  COMMENT_EXP       => |lexer:&mut HandleBarsLexer<R>| { Some( TokCommentExp(    lexer.yystr() ) ) }
 
-    PASS_ESC          => |lexer:&mut HandleBarsLexer<R>| Some( TokRaw( lexer.yystr()    ) )
-    ESCAPED_EXP       => |_|                             Some( TokRaw( "{".to_string()  ) )
-    ESCAPED_ESC       => |_|                             Some( TokRaw( "\\".to_string() ) )
-    ESCAPED_SKIP      => |lexer:&mut HandleBarsLexer<R>| Some( TokRaw( lexer.yystr()    ) )
+  PASS_ESC          => |lexer:&mut HandleBarsLexer<R>| { Some( TokRaw( lexer.yystr()    ) ) }
+  ESCAPED_EXP       => |    _:&mut HandleBarsLexer<R>| { Some( TokRaw( "{".to_string()  ) ) }
+  ESCAPED_ESC       => |    _:&mut HandleBarsLexer<R>| { Some( TokRaw( "\\".to_string() ) ) }
+  ESCAPED_SKIP      => |lexer:&mut HandleBarsLexer<R>| { Some( TokRaw( lexer.yystr()    ) ) }
 }
 
 rustlex! HBExpressionLexer {
@@ -114,34 +114,34 @@ rustlex! HBExpressionLexer {
   let OPTION_NAME      = IDENTIFIER "=";
 
   INITIAL {
-    NO_WP       => |lexer:&mut HBExpressionLexer<R>| { lexer.FORCE_END(); Some( TokNoWhiteSpaceAfter ) }
+    NO_WP       => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.FORCE_END(); Some( TokNoWhiteSpaceAfter ) }
 
-    START       => |lexer:&mut HBExpressionLexer<R>| { lexer.ACCESSOR(); None }
-    START_NO_WP => |lexer:&mut HBExpressionLexer<R>| { lexer.ACCESSOR(); Some(TokNoWhiteSpaceBefore) }
-    ALL_WP      => |lexer:&mut HBExpressionLexer<R>| { Some( TokLeadingWhiteSpace( lexer.yystr() ) ) }
+    START       => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.ACCESSOR(); None }
+    START_NO_WP => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.ACCESSOR(); Some(TokNoWhiteSpaceBefore) }
+    ALL_WP      => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { Some( TokLeadingWhiteSpace( lexer.yystr() ) ) }
 
-    COMMENT_START       => |lexer:&mut HBExpressionLexer<R>| { lexer.COMMENT(); None }
-    COMMENT_START_NO_WP => |lexer:&mut HBExpressionLexer<R>| { lexer.COMMENT(); Some(TokNoWhiteSpaceBefore) }
+    COMMENT_START       => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.COMMENT(); None }
+    COMMENT_START_NO_WP => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.COMMENT(); Some(TokNoWhiteSpaceBefore) }
 
-    END         => |lexer:&mut HBExpressionLexer<R>| { lexer.TRAILING_WP(); None }
+    END         => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.TRAILING_WP(); None }
   }
 
   ACCESSOR {
-    IDENTIFIER =>       |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( lexer.yystr() ) ) }
-    BRACKET_ID_START => |lexer:&mut HBExpressionLexer<R>| { lexer.ID_ANY(); None }
+    IDENTIFIER       => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.PROPERTY_PATH(); Some( TokPathEntry( lexer.yystr() ) ) }
+    BRACKET_ID_START => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.ID_ANY(); None }
 
-    STRING_START => |lexer:&mut HBExpressionLexer<R>| { lexer.STRING_PARAM(); None } // for parameters only
+    STRING_START => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.STRING_PARAM(); None } // for parameters only
 
-    THIS         => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( ".".to_string()  ) ) }
-    PARENT_ALIAS => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( "..".to_string() ) ) }
+    THIS         => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.PROPERTY_PATH(); Some( TokPathEntry( ".".to_string()  ) ) }
+    PARENT_ALIAS => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.PROPERTY_PATH(); Some( TokPathEntry( "..".to_string() ) ) }
 
-    NO_WP       => |lexer:&mut HBExpressionLexer<R>| { lexer.FORCE_END(); Some( TokNoWhiteSpaceAfter ) }
-    END         => |lexer:&mut HBExpressionLexer<R>| { lexer.TRAILING_WP(); None }
+    NO_WP       => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.FORCE_END(); Some( TokNoWhiteSpaceAfter ) }
+    END         => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.TRAILING_WP(); None }
   }
 
   PROPERTY_PATH {
-    ACCESSOR_SEP => |lexer:&mut HBExpressionLexer<R>| { lexer.ACCESSOR(); None }
-    ACCESSOR_END => |lexer:&mut HBExpressionLexer<R>| {
+    ACCESSOR_SEP => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.ACCESSOR(); None }
+    ACCESSOR_END => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> {
       if lexer.in_options  { lexer.OPTIONS() } else { lexer.PARAMS() };
       if lexer.in_params {
         Some( TokParamSep )
@@ -152,75 +152,75 @@ rustlex! HBExpressionLexer {
     }
 
     // common ending
-    NO_WP        => |lexer:&mut HBExpressionLexer<R>| { lexer.FORCE_END(); Some( TokNoWhiteSpaceAfter ) }
-    END          => |lexer:&mut HBExpressionLexer<R>| { lexer.TRAILING_WP(); None }
+    NO_WP        => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.FORCE_END(); Some( TokNoWhiteSpaceAfter ) }
+    END          => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.TRAILING_WP(); None }
   }
 
   ID_ANY {
-    BRACKETED_ID   => |lexer:&mut HBExpressionLexer<R>| { Some( TokPathEntry( lexer.yystr() ) ) }
-    BRACKET_ID_END => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); None }
+    BRACKETED_ID   => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { Some( TokPathEntry( lexer.yystr() ) ) }
+    BRACKET_ID_END => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.PROPERTY_PATH(); None }
   }
 
   PARAMS {
-    PARAMS_SEP   => |_| { Some( TokParamSep ) }
-    IDENTIFIER   => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( lexer.yystr() ) ) }
-    STRING_START => |lexer:&mut HBExpressionLexer<R>| { lexer.STRING_PARAM(); None }
+    PARAMS_SEP   => |    _:&mut HBExpressionLexer<R>| -> Option<HBToken> { Some( TokParamSep ) }
+    IDENTIFIER   => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.PROPERTY_PATH(); Some( TokPathEntry( lexer.yystr() ) ) }
+    STRING_START => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.STRING_PARAM(); None }
 
-    THIS         => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( ".".to_string()  ) ) }
-    PARENT_ALIAS => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( "..".to_string() ) ) }
+    THIS         => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.PROPERTY_PATH(); Some( TokPathEntry( ".".to_string()  ) ) }
+    PARENT_ALIAS => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.PROPERTY_PATH(); Some( TokPathEntry( "..".to_string() ) ) }
 
     // end of parameters
-    OPTION_NAME  => |lexer:&mut HBExpressionLexer<R>| {
+    OPTION_NAME  => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> {
       lexer.in_options = true;
       lexer.OPTION_VALUE();
       Some( TokOption( lexer.yystr().as_slice().trim_right_matches('=').to_string() ) )
     }
 
     // common expression ending
-    NO_WP        => |lexer:&mut HBExpressionLexer<R>| { lexer.FORCE_END(); Some( TokNoWhiteSpaceAfter ) }
-    END          => |lexer:&mut HBExpressionLexer<R>| { lexer.TRAILING_WP(); None }
+    NO_WP        => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.FORCE_END(); Some( TokNoWhiteSpaceAfter ) }
+    END          => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.TRAILING_WP(); None }
 
   }
 
   STRING_PARAM {
-    STRING_CTNT => |lexer:&mut HBExpressionLexer<R>| { Some( TokStringParam( lexer.yystr() ) ) }
-    STRING_END  => |lexer:&mut HBExpressionLexer<R>| { if lexer.in_options  { lexer.OPTIONS() } else { lexer.PARAMS() }; None }
+    STRING_CTNT => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { Some( TokStringParam( lexer.yystr() ) ) }
+    STRING_END  => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { if lexer.in_options  { lexer.OPTIONS() } else { lexer.PARAMS() }; None }
   }
 
   OPTION_VALUE {
     // all of these have conditional ending with in_params
-    IDENTIFIER       => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( lexer.yystr() ) ) }
-    BRACKET_ID_START => |lexer:&mut HBExpressionLexer<R>| { lexer.ID_ANY(); None }
-    STRING_START     => |lexer:&mut HBExpressionLexer<R>| { lexer.STRING_PARAM(); None }
+    IDENTIFIER       => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.PROPERTY_PATH(); Some( TokPathEntry( lexer.yystr() ) ) }
+    BRACKET_ID_START => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.ID_ANY(); None }
+    STRING_START     => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.STRING_PARAM(); None }
 
-    THIS         => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( ".".to_string()  ) ) }
-    PARENT_ALIAS => |lexer:&mut HBExpressionLexer<R>| { lexer.PROPERTY_PATH(); Some( TokPathEntry( "..".to_string() ) ) }
+    THIS         => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.PROPERTY_PATH(); Some( TokPathEntry( ".".to_string()  ) ) }
+    PARENT_ALIAS => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.PROPERTY_PATH(); Some( TokPathEntry( "..".to_string() ) ) }
 
     // ok, pure option parsing for now
   }
 
   OPTIONS {
-    OPTION_NAME  => |lexer:&mut HBExpressionLexer<R>| {  lexer.OPTION_VALUE(); Some( TokOption( lexer.yystr().as_slice().trim_right_matches('=').to_string() ) ) }
-    PARAMS_SEP   => |_| { None }
+    OPTION_NAME  => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> {  lexer.OPTION_VALUE(); Some( TokOption( lexer.yystr().as_slice().trim_right_matches('=').to_string() ) ) }
+    PARAMS_SEP   => |    _:&mut HBExpressionLexer<R>| -> Option<HBToken> { None }
 
     // common expression ending
-    NO_WP        => |lexer:&mut HBExpressionLexer<R>| { lexer.FORCE_END(); Some( TokNoWhiteSpaceAfter ) }
-    END          => |lexer:&mut HBExpressionLexer<R>| { lexer.TRAILING_WP(); None }
+    NO_WP        => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.FORCE_END(); Some( TokNoWhiteSpaceAfter ) }
+    END          => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.TRAILING_WP(); None }
   }
 
   COMMENT {
-    END             => |lexer:&mut HBExpressionLexer<R>| { lexer.TRAILING_WP(); None }
-    NO_WP           => |lexer:&mut HBExpressionLexer<R>| { lexer.FORCE_END(); Some( TokNoWhiteSpaceAfter ) }
+    END             => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.TRAILING_WP(); None }
+    NO_WP           => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.FORCE_END(); Some( TokNoWhiteSpaceAfter ) }
 
-    COMMENT_CONTENT => |_| { None }
+    COMMENT_CONTENT => |    _:&mut HBExpressionLexer<R>| -> Option<HBToken> { None }
   }
 
   FORCE_END {
-    END => |lexer:&mut HBExpressionLexer<R>| { lexer.TRAILING_WP(); None }
+    END => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { lexer.TRAILING_WP(); None }
   }
 
   TRAILING_WP {
-    ALL_WP => |lexer:&mut HBExpressionLexer<R>| Some( TokTrailingWhiteSpace( lexer.yystr() ) )
+    ALL_WP => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> { Some( TokTrailingWhiteSpace( lexer.yystr() ) ) }
   }
 
 
