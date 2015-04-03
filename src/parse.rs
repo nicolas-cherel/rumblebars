@@ -684,7 +684,7 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
           };
 
           // attach content to parent
-          let mut err = Ok(vec![]); // error checking on reduce
+
           if let Some(&mut (ref mut parents, _)) = stack.last_mut() {
             if let HBEntry::Eval(ref hb) = *entry {
               match (***parents).last_mut() {
@@ -702,15 +702,23 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
                       }
 
                     } else {
-                      err = Err((ParseError::UnmatchedBlock, Some(format!("‘{}’ does not match ‘{}’", hb.path(), parent.path()))))
-
+                      return Err((
+                        ParseError::UnmatchedBlock,
+                        Some(format!("‘{}’ does not match ‘{}’", hb.path(), parent.path()))
+                      ));
                     }
                   } else {
-                    err = Err((ParseError::UnexpectedBlockClose, Some(format!("‘{}’ does not close any block", hb.path()))));
+                    return Err((
+                      ParseError::UnexpectedBlockClose,
+                      Some(format!("‘{}’ does not close any block", hb.path()))
+                    ));
                   }
                 }
                 _ => {
-                  err = Err((ParseError::UnexpectedBlockClose, Some(format!("‘{}’ does not close any block", hb.path()))));
+                  return Err((
+                    ParseError::UnexpectedBlockClose,
+                    Some(format!("‘{}’ does not close any block", hb.path()))
+                  ));
                 }
               }
             } else {
@@ -718,10 +726,6 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
             }
           } else {
             panic!("Should not reach: there's a bug in handelbars template@ parser, we're doing a block reduce on invalid parsing state");
-          }
-
-          if err.is_err() {
-            return err;
           }
 
         }
