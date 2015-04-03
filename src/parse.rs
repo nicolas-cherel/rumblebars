@@ -292,15 +292,13 @@ impl ::std::default::Default for Template {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone,Copy)]
 pub enum ParseError {
   UnkownError, // unknown as ‘still not diagnosed’ case, not ’your grandma's TV is set on fire’ case
   InvalidExpression,
   UnmatchedBlock,
   UnexpectedBlockClose,
 }
-
-impl Copy for ParseError {}
 
 fn parse_hb_expression(exp: &str) -> Result<HBExpressionParsing, (ParseError, Option<String>)> {
   let mut lexer = HBExpressionLexer::new(BufReader::new(exp.as_bytes()));

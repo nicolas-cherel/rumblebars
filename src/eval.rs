@@ -397,7 +397,6 @@ impl <'a> HBData for FallbackToOptions<'a> {
 
 pub type HelperFunction = fn(params: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, hb_context: &EvalContext) -> HBEvalResult;
 
-#[derive(Copy)]
 pub struct Helper {
   helper_func: HelperFunction,
 }
