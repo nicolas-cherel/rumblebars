@@ -1,6 +1,6 @@
 [package]
 name = "rumblebars"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Nicolas Cherel"]
 description = "a handlerbars template expansion library"
 homepage = "https://github.com/nicolas-cherel/rumblebars"
