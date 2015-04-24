@@ -1,6 +1,5 @@
 #![feature(slice_patterns)]
-#![feature(old_path)]
-#![feature(old_io)]
+#![feature(path_ext)]
 
 extern crate rumblebars;
 extern crate rustc_serialize as serialize;
