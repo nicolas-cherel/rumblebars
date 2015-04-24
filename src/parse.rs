@@ -173,7 +173,7 @@ rustlex! HBExpressionLexer {
     OPTION_NAME  => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> {
       lexer.in_options = true;
       lexer.OPTION_VALUE();
-      Some( TokOption( lexer.yystr().as_slice().trim_right_matches('=').to_string() ) )
+      Some( TokOption( lexer.yystr().trim_right_matches('=').to_string() ) )
     }
 
     // common expression ending
@@ -200,7 +200,7 @@ rustlex! HBExpressionLexer {
   }
 
   OPTIONS {
-    OPTION_NAME  => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> {  lexer.OPTION_VALUE(); Some( TokOption( lexer.yystr().as_slice().trim_right_matches('=').to_string() ) ) }
+    OPTION_NAME  => |lexer:&mut HBExpressionLexer<R>| -> Option<HBToken> {  lexer.OPTION_VALUE(); Some( TokOption( lexer.yystr().trim_right_matches('=').to_string() ) ) }
     PARAMS_SEP   => |    _:&mut HBExpressionLexer<R>| -> Option<HBToken> { None }
 
     // common expression ending
