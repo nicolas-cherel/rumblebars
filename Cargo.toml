@@ -18,10 +18,10 @@ doctest = false
 rustc-serialize = "0.3"
 regex = "0.1"
 regex_macros = "0.1"
-# rustlex = "0.2" # when it works
+rustlex = "0.2" # when it works
 
 # for dev cycles
-[dependencies.rustlex]
+# [dependencies.rustlex]
 # path = "../rustlex" # either this for local rustlex install
-git = "https://github.com/nicolas-cherel/rustlex" # or that for compat buffer
-branch = "rumblebars-compat"
+# git = "https://github.com/nicolas-cherel/rustlex" # or that for compat buffer
+# branch = "rumblebars-compat"
