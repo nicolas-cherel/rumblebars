@@ -1,15 +1,24 @@
 #![crate_name="rumblebars"]
-#![feature(plugin)]
-#![feature(core)] // for rustlext
-#![plugin(rustlex)]
-#![feature(test)]
+
+#![cfg_attr(feature = "nightly", feature(test))]
+#![cfg_attr(not(feature = "with-syntex"), feature(plugin))]
+#![cfg_attr(not(feature = "with-syntex"), plugin(rustlex))]
+
+#[cfg(feature = "with-syntex")] extern crate rustlex_codegen as rustlex;
+#[cfg(not(feature = "with-syntex"))] #[warn(plugin_as_library)] extern crate rustlex;
+
+mod parse {
+  #[cfg(not(feature = "with-syntex"))] include!("parse.lex.rs");
+  #[cfg(feature = "with-syntex")] include!(concat!(env!("OUT_DIR"), "/parse.rs"));
+}
 
 
 extern crate regex;
-extern crate rustlex;
 extern crate rustc_serialize as serialize;
 
-extern crate test;
+
+#[cfg(feature = "nightly")] extern crate test;
+
 #[macro_use]
 extern crate lazy_static;
 
@@ -27,7 +36,6 @@ pub use self::eval::HelperOptions;
 pub use self::eval::HelperOptionsByName;
 pub use self::eval::SafeWriting;
 
-mod parse;
 mod eval;
 mod helpers_builtins;
 

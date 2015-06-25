@@ -8,17 +8,30 @@ repository = "https://github.com/nicolas-cherel/rumblebars"
 readme = "README.md"
 keywords = ["handlerbars", "template", "expansion", "engine", "helper"]
 license = "MIT/Apache-2.0"
+build = "build.rs"
 
+[features]
+default     = ["stable"]
+nightly     = ["rustlex"]
+stable      = ["with-syntex"]
+with-syntex = [ "syntex", "rustlex_codegen/with-syntex"]
+
+[build-dependencies]
+rustlex_codegen = { version = "*", optional = true }
+rustlex         = { version = "*", optional = true }
+syntex          = { version = "*", optional = true }
 
 [lib]
-name = "rumblebars"
+name    = "rumblebars"
 doctest = false
 
 [dependencies]
 rustc-serialize = "0.3"
-regex = "0.1"
-regex_macros = "0.1"
-rustlex = "0.2" # when it works
+regex           = "*"
+lazy_static     = "*"
+rustlex_codegen = { version = "*", optional = true }
+rustlex         = { version = "*", optional = true }
+syntex          = { version = "*", optional = true }
 
 # for dev cycles
 # [dependencies.rustlex]

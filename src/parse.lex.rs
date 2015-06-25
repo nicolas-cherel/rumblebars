@@ -1040,6 +1040,7 @@ mod tests {
 }
 
 #[cfg(test)]
+#[cfg(feature = "nightly")]
 mod bench {
 
   use super::parse_hb_expression;
