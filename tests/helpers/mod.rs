@@ -267,8 +267,8 @@ fn helper() {
 
 #[allow(unused_variables)]
 fn c(params: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, hb_context: &EvalContext) -> HBEvalResult {
-  match params {
-    [param, ..] => param.write_value(out),
+  match params.first() {
+    Some(param) => param.write_value(out),
     _ => Ok(()),
   }
 }
@@ -290,8 +290,8 @@ fn helper_context() {
 
 #[allow(unused_variables)]
 fn v(params: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, hb_context: &EvalContext) -> HBEvalResult {
-  match params {
-    [v] => v.write_value(out),
+  match (params.first(), params.len()) {
+    (Some(v), 1) => v.write_value(out),
     _ => write!(out, "failed…"),
   }
 }
@@ -354,8 +354,8 @@ fn helper_globals() {
 }
 
 fn for_root_check(params: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, _: &EvalContext) -> HBEvalResult {
-  match params {
-    [p] => options.render_fn_with_context(p, out),
+  match (params.first(), params.len()) {
+    (Some(&p), 1) => options.render_fn_with_context(p, out),
     _ => Ok(()),
   }
 

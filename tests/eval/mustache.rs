@@ -1,7 +1,6 @@
 
 use std::path::Path;
 use std::fs;
-use std::fs::PathExt;
 use std::io::Read;
 use std::default::Default;
 
@@ -11,7 +10,7 @@ use rumblebars::HBData;
 fn test_set(set_name: &str) {
   let path_str = format!("{}/tests/mustache/specs", option_env!("CARGO_MANIFEST_DIR").unwrap_or("."));
   let specs_path = Path::new(&path_str);
-  if specs_path.is_dir() {
+  if fs::metadata(specs_path).and_then(|m| Ok(m.is_dir())).unwrap_or(false) { // check for directory
     let mut buf_json = Vec::<u8>::new();
     match fs::File::open(Path::new(&format!("{}/{}.json", specs_path.to_string_lossy(), set_name))) {
       Ok(ref mut reader) => {
