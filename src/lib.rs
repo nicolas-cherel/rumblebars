@@ -1,13 +1,10 @@
 #![crate_name="rumblebars"]
 #![feature(plugin)]
-#![feature(slice_patterns)]
 #![feature(core)] // for rustlext
-#![feature(collections)]
 #![plugin(regex_macros)]
 #![plugin(rustlex)]
 #![feature(test)]
 
-#![feature(str_char)]
 
 extern crate regex;
 extern crate rustlex;

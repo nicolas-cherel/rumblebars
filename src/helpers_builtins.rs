@@ -86,26 +86,26 @@ pub fn each_helper(params: &[&HBData], options: &HelperOptions, out: &mut SafeWr
 }
 
 pub fn lookup_helper(params: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, _: &EvalContext) -> HBEvalResult {
-  match params {
-    [key] => {
+  match (params.first(), params.get(1)) {
+    (Some(&key), None) => {
       match options.lookup(key) {
         Some(data) => data.write_value(out),
         None => Ok(())
       }
     },
-    [context, key] | [context, key, ..] => {
+    (Some(&context), Some(&key)) => {
       match options.lookup_with_context(key, context) {
         Some(data) => data.write_value(out),
         None => Ok(())
       }
     },
-    [] => Ok(())
+    (None, _) => Ok(())
   }
 }
 
 pub fn with_helper(params: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, _: &EvalContext) -> HBEvalResult {
-  match params {
-    [context] if context.as_bool() => options.render_fn_with_context(context, out),
+  match (params.first(), params.len()) {
+    (Some(&context), 1) if context.as_bool() => options.render_fn_with_context(context, out),
     _ => options.inverse(out),
   }
 }

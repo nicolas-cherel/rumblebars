@@ -107,26 +107,29 @@ impl <'a> io::Write for IndentWriter<'a> {
         let mut r = Ok(0);
         let ref mut writer = self.w;
         let as_utf8 = unsafe { ::std::str::from_utf8_unchecked(buf) };
-        let mut i = 0usize;
+        let mut chars = as_utf8.char_indices();
+        let mut i = chars.next().unwrap_or((0, ' ')).0; // init with first char
         while i < as_utf8.len() {
-          let ::std::str::CharRange {ch: _, next} = as_utf8.char_range_at(i);
+          match chars.next().or(Some((as_utf8.len(), ' '))) {
+            Some((next, _)) => {
+              r = match &as_utf8[i..next] {
+                "\n"  => {
+                  writer.write("\n".as_bytes()).and_then(|_| {
+                    writer.write(&indent_str.as_bytes())
+                  })
+                },
+                chr => {
+                  writer.write(chr.as_bytes())
+                }
+              };
 
-          r = match &as_utf8[i..next] {
-            "\n"  => {
-              writer.write("\n".as_bytes()).and_then(|_| {
-                writer.write(&indent_str.as_bytes())
-              })
+              i = next;
+
+              if r.is_err() {
+                break;
+              }
             },
-            chr => {
-              writer.write(chr.as_bytes())
-            }
-          };
-
-
-          i = next;
-
-          if r.is_err() {
-            break;
+            None => break,
           }
         }
 
@@ -198,26 +201,33 @@ impl <'a> io::Write for HTMLSafeWriter<'a> {
     let writer = self.writer();
 
     let as_utf8 = unsafe { ::std::str::from_utf8_unchecked(buf) };
-    let mut i = 0usize;
+    let mut chars = as_utf8.char_indices();
+    let mut i = chars.next().unwrap_or((0, ' ')).0; // init with first char
     while i < as_utf8.len() {
-      let ::std::str::CharRange {ch: _, next} = as_utf8.char_range_at(i);
-      r = match &as_utf8[i..next] {
-        "<"  => writer.write("&lt;".as_bytes()),
-        ">"  => writer.write("&gt;".as_bytes()),
-        "&"  => writer.write("&amp;".as_bytes()),
-        "\"" => writer.write("&quot;".as_bytes()),
-        "\'" => writer.write("&#x27;".as_bytes()),
-        "`"  => writer.write("&#x60;".as_bytes()),
-        "\\" => writer.write("\\".as_bytes()),
-        chr  => writer.write(chr.as_bytes()),
-      };
+      match chars.next().or(Some((as_utf8.len(), ' '))) {
+        Some((next, _)) => {
 
-      i = next;
+          r = match &as_utf8[i..next] {
+            "<"  => writer.write("&lt;".as_bytes()),
+            ">"  => writer.write("&gt;".as_bytes()),
+            "&"  => writer.write("&amp;".as_bytes()),
+            "\"" => writer.write("&quot;".as_bytes()),
+            "\'" => writer.write("&#x27;".as_bytes()),
+            "`"  => writer.write("&#x60;".as_bytes()),
+            "\\" => writer.write("\\".as_bytes()),
+            chr  => writer.write(chr.as_bytes()),
+          };
 
-      if r.is_err() {
-        break;
+          i = next;
+
+          if r.is_err() {
+            break;
+          }
+        },
+        None => break,
       }
     }
+
     r.and(Ok(buf.len()))
   }
 
@@ -389,8 +399,12 @@ impl <'a> HBData for FallbackToOptions<'a> {
 
   fn keys(&self) -> Option<Vec<&str>> {
     let mut res = vec![];
-    res.append(&mut self.data.keys().iter().map(|e| e.iter().map(|&e| e)).flat_map(|e| e).collect::<Vec<_>>());
-    res.append(&mut self.options.keys().map(|&e| e).collect::<Vec<_>>());
+    for v in &mut self.data.keys().iter().map(|e| e.iter().map(|&e| e)).flat_map(|e| e) {
+      res.push(v);
+    }
+    for v in &mut self.options.keys().map(|&e| e) {
+      res.push(v);
+    }
     Some(res)
   }
 }
@@ -557,8 +571,8 @@ impl Helper {
     global_data: &HashMap<&str, &'a HBData>
   ) -> HBEvalResult {
 
-    let condition = match &params[..] {
-      [ref val, ..] => match val {
+    let condition = match params.first() {
+      Some(val) => match val {
         &HBValHolder::String(ref s) => s.as_bool(),
         &HBValHolder::Path(ref p) => if let Some(v) = value_for_key_path_in_context(context, p, ctxt_stack, global_data, hb_context.compat) {
           v.as_bool()
@@ -709,8 +723,8 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(entries: &'a Entries, data: &'a HBD
           })
         },
         HBEntry::Partial(ref exp) => {
-          match &exp.base[..] {
-            [ref single] => {
+          match exp.base.first() {
+            Some(ref single) if exp.base.len() == 1 => {
               match eval_context.partial_with_name(&single) {
                 Some(t) => {
                   let c_ctxt = if let Some(&HBValHolder::Path(ref p)) = exp.params.get(0) {
@@ -760,14 +774,14 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(entries: &'a Entries, data: &'a HBD
                 _ => Ok(())
               }
             }
-            [_, ..] => panic!("invalid partial name '{}'", exp.path()),
-            [] => panic!("invalid empty string to retrieve partial by name"),
+            Some(_) => panic!("invalid partial name '{}'", exp.path()),
+            None => panic!("invalid empty string to retrieve partial by name"),
           }
         },
 
         HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref render_options, block: None, else_block: None}) => {
-          match &base[..] {
-            [ref single] if eval_context.has_helper_with_name(&single) => {
+          match (base.first(), base.len()) {
+            (Some(ref single), 1) if eval_context.has_helper_with_name(&single) => {
               let helper = eval_context.helper_with_name(&single).unwrap();
               if render_options.escape {
                 IndentWriter::with_indent(indent.clone(), out, &|w| {
@@ -801,8 +815,8 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(entries: &'a Entries, data: &'a HBD
 
         HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref render_options, ref block, ref else_block}) => {
           render_options.escape; // only suppress unused warning
-          match &base[..] {
-            [ref single] if eval_context.has_helper_with_name(&single) => {
+          match (base.first(), base.len()) {
+            (Some(ref single), 1) if eval_context.has_helper_with_name(&single) => {
               let helper = eval_context.helper_with_name(&single).unwrap();
 
               // collect options of deref'd blocks
@@ -813,7 +827,7 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(entries: &'a Entries, data: &'a HBD
                 }
               }).collect();
 
-              if let [opt_block, opt_else_block] = &blocks[..] {
+              if let (Some(&opt_block), Some(&opt_else_block), 2) = (blocks.first(), blocks.get(1), blocks.len()) {
                 helper.call_for_block(
                   opt_block,
                   opt_else_block,
