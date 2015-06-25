@@ -1,5 +1,6 @@
 use std::io::BufReader;
 use serialize::json::Json;
+use regex::Regex;
 
 use self::Token::{TokSimpleExp, TokNoEscapeExp, TokCommentExp, TokBlockExp, TokBlockElseCond, TokBlockEndExp, TokPartialExp, TokRaw};
 use self::HBToken::{TokPathEntry,TokNoWhiteSpaceBefore, TokNoWhiteSpaceAfter,TokStringParam,TokParamStart, TokParamSep, TokOption, TokLeadingWhiteSpace, TokTrailingWhiteSpace};
@@ -300,6 +301,15 @@ pub enum ParseError {
   UnexpectedBlockClose,
 }
 
+lazy_static! {
+  static ref INDENT_MATCH: Regex = Regex::new("([:blank:]*)$").unwrap();
+  static ref END_WP_TRIMMER: Regex = Regex::new("(\r?\n)[:blank:]*(\\{\\{~?[#!/](?:\\}?[^}])*\\}\\})[:blank:]*(:?\r?\n)?\\z").unwrap();
+  static ref PARTIAL_END_WP_TRIMMER: Regex = Regex::new("(\r?\n[:blank:]*)(\\{\\{~?>(?:\\}?[^}])*\\}\\})[:blank:]*(:?\r?\n)?\\z").unwrap();
+
+  static ref TRIM_LEAD_SPACE_MATCHER: Regex = Regex::new("((?:[:blank:]|\r?\n)*)(\r?\n)[:blank:]*$").unwrap();
+  static ref TRIM_TRAIL_SPACE_MATCHER: Regex = Regex::new("^([:blank:]*\r?\n)(.*)").unwrap();
+}
+
 fn parse_hb_expression(exp: &str) -> Result<HBExpressionParsing, (ParseError, Option<String>)> {
   let mut lexer = HBExpressionLexer::new(BufReader::new(exp.as_bytes()));
   let mut render_options = RenderOptions {
@@ -319,8 +329,7 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpressionParsing, (ParseError, Op
   while let Some(tok) = lexer.next() {
     match tok {
       TokLeadingWhiteSpace(s) => {
-        let indent_space_matcher = regex!("([:blank:]*)$");
-        render_options.indent = indent_space_matcher.captures(&s).and_then(|s| s.at(1) ).map(|s| s.to_string());
+        render_options.indent = INDENT_MATCH.captures(&s).and_then(|s| s.at(1) ).map(|s| s.to_string());
         leading_whitespace = Some(s);
       },
 
@@ -372,15 +381,15 @@ fn parse_hb_expression(exp: &str) -> Result<HBExpressionParsing, (ParseError, Op
             _ => { break; }
           }
         }
-        let literal_param = match &param_path[..] {
-          [ref s] => {
+        let literal_param = match param_path.first() {
+          Some(s) if param_path.len() == 1 => {
             if let Ok(j) = Json::from_str(s) {
               Some(HBValHolder::Literal(j, s.clone()))
             } else {
               None
             }
           },
-          _ => None,
+          Some(_) | None => None,
         };
 
         if let Some(p) = literal_param {
@@ -452,19 +461,17 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
   // but it's very (very) convenient for this case
 
   // general case,
-  let end_wp_trimmer = regex!("(\r?\n)[:blank:]*(\\{\\{~?[#!/](?:\\}?[^}])*\\}\\})[:blank:]*(:?\r?\n)?\\z");
+  ;
   // partial case
-  let partial_end_wp_trimmer = regex!("(\r?\n[:blank:]*)(\\{\\{~?>(?:\\}?[^}])*\\}\\})[:blank:]*(:?\r?\n)?\\z");
-  let trimmed = end_wp_trimmer.replace_all(&template,"$1$2");
-  let trimmed = partial_end_wp_trimmer.replace_all(&trimmed,"$1$2");
+
+  let trimmed = END_WP_TRIMMER.replace_all(&template,"$1$2");
+  let trimmed = PARTIAL_END_WP_TRIMMER.replace_all(&trimmed,"$1$2");
 
   let lexer = HandleBarsLexer::new(BufReader::new(trimmed.as_bytes()));
 
   // parse stack entry tuple: (template, is_else_block)
   let mut stack = vec![(Box::new(vec![]) , false)];
 
-  let trim_lead_space_matcher = regex!("((?:[:blank:]|\r?\n)*)(\r?\n)[:blank:]*$");
-  let trim_trail_space_matcher = regex!("^([:blank:]*\r?\n)(.*)");
 
   let mut previous_trail_whitespace: Option<(String, bool)> = None;
   let mut first = true;
@@ -605,11 +612,11 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
               Some((Some(""), Some("")))
             } else {
               // check against auto trim leading space rules
-              trim_lead_space_matcher.captures(&lead_space).and_then(|s| Some((s.at(1), s.at(2))))
+              TRIM_LEAD_SPACE_MATCHER.captures(&lead_space).and_then(|s| Some((s.at(1), s.at(2))))
             };
 
             // check trailing whitespace against auto trim trailing space rules
-            let trail_matches = trim_trail_space_matcher.captures(&trail_space)
+            let trail_matches = TRIM_TRAIL_SPACE_MATCHER.captures(&trail_space)
               .and_then(|s| Some((s.at(1).map(|p| p.to_string()), s.at(2).map(|p| p.to_string()))));
 
             // check matches, is both are ok, go on trimming

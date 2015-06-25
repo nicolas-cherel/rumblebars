@@ -1,7 +1,6 @@
 #![crate_name="rumblebars"]
 #![feature(plugin)]
 #![feature(core)] // for rustlext
-#![plugin(regex_macros)]
 #![plugin(rustlex)]
 #![feature(test)]
 
@@ -11,6 +10,8 @@ extern crate rustlex;
 extern crate rustc_serialize as serialize;
 
 extern crate test;
+#[macro_use]
+extern crate lazy_static;
 
 
 pub use self::parse::parse;
