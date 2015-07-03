@@ -243,15 +243,22 @@ impl <'a> SafeWriter for HTMLSafeWriter<'a> {
 }
 
 pub type HBEvalResult = io::Result<()>;
+pub type HBKeysIter<'a> = Box<Iterator<Item = &'a str> + 'a>;
+pub type HBValuesIter<'a> = Box<Iterator<Item = &'a (HBData + 'a)> + 'a>;
+pub type HBIter<'a> = Box<Iterator<Item = (&'a str, &'a (HBData + 'a))> + 'a>;
 
 pub trait HBData  {
   fn write_value(&self, out: &mut SafeWriting) -> HBEvalResult;
   fn typed_node(&self) -> HBNodeType<&HBData>;
-  fn as_array(&self) -> Option<Vec<&HBData>>;
   fn get_key(&self, key: &str) -> Option<&HBData>;
   fn as_bool(&self) -> bool;
-  fn keys(&self) -> Option<Vec<&str>>;
+
+  fn keys<'a>(&'a self)   -> HBKeysIter<'a>;
+  fn values<'a>(&'a self) -> HBValuesIter<'a>;
+
+  fn iter<'a>(&'a self)   -> HBIter<'a>;
 }
+
 
 impl HBData for Json {
 
@@ -291,16 +298,6 @@ impl HBData for Json {
     }
   }
 
-  fn as_array(&self) -> Option<Vec<&HBData>> {
-    return match self {
-      &Json::Array(ref a) => {
-        Some(a.iter().map(|e| { e as &HBData }).collect())
-      },
-      _ => None,
-    }
-
-  }
-
   fn get_key(&self, key: &str) -> Option<&HBData> {
     return match self {
       &Json::Array(ref a) => {
@@ -336,18 +333,23 @@ impl HBData for Json {
     }
   }
 
-  fn keys(&self) -> Option<Vec<&str>> {
-    match self {
-      &Json::Object(ref o) => {
-        let mut keys:Vec<_> = o.keys().map(|k| &k[..]).collect();
-        keys.sort_by(|a, b| a.cmp(b));
-        Some(keys)
-      },
-      _ => None,
+  fn values<'a>(&'a self) -> HBValuesIter<'a> {
+    return match self {
+      &Json::Array(ref a)   => Box::new(a.iter().map(|v| v as &'a HBData)) as HBValuesIter<'a>,
+      &Json::Object(_)      => Box::new(self.iter().map(|(_, v)| v as &'a HBData))  as HBValuesIter<'a>,
+      _                     => Box::new(None.into_iter()),
     }
   }
 
+  fn keys<'a>(&'a self) -> HBKeysIter<'a> {
+    self.as_object().map(|o| Box::new(o.keys().map(|s| &s[..])) as HBKeysIter<'a> ).unwrap_or(Box::new(None.into_iter()))
+  }
 
+  fn iter<'a>(&'a self) -> HBIter<'a> {
+    self.as_object().map(|o|
+      Box::new(o.into_iter().map(|(s, j)| (&s[..], j as &HBData))) as HBIter<'a>
+    ).unwrap_or(Box::new(None.into_iter()))
+  }
 }
 
 impl HBData for String {
@@ -361,9 +363,10 @@ impl HBData for String {
 
   fn as_bool(&self) -> bool { &self[..] == "" }
 
-  fn as_array<'a>(&'a self) -> Option<Vec<&'a HBData>> { None }
   fn get_key<'a>(&'a self, _: &str) -> Option<&'a HBData> { None }
-  fn keys(&self) -> Option<Vec<&str>> { None }
+  fn keys<'a>(&'a self) -> HBKeysIter<'a> { Box::new(None.into_iter()) }
+  fn values<'a>(&'a self) -> HBValuesIter<'a> { Box::new(None.into_iter()) }
+  fn iter<'a>(&'a self) -> HBIter<'a> { Box::new(None.into_iter()) }
 }
 
 struct FallbackToOptions<'a> {
@@ -380,10 +383,6 @@ impl <'a> HBData for FallbackToOptions<'a> {
     self.data.typed_node()
   }
 
-  fn as_array(&self) -> Option<Vec<&HBData>> {
-    self.data.as_array()
-  }
-
   fn get_key(&self, key: &str) -> Option<&HBData> {
     match self.data.get_key(key) {
       v @ Some(_) => v,
@@ -397,15 +396,16 @@ impl <'a> HBData for FallbackToOptions<'a> {
     self.data.as_bool()
   }
 
-  fn keys(&self) -> Option<Vec<&str>> {
-    let mut res = vec![];
-    for v in &mut self.data.keys().iter().map(|e| e.iter().map(|&e| e)).flat_map(|e| e) {
-      res.push(v);
-    }
-    for v in &mut self.options.keys().map(|&e| e) {
-      res.push(v);
-    }
-    Some(res)
+  fn keys<'b>(&'b self) -> HBKeysIter<'b> {
+    Box::new(self.data.keys().chain(self.options.keys().map(|&s| s))) as HBKeysIter<'b>
+  }
+
+  fn values<'b>(&'b self) -> HBValuesIter<'b> {
+    Box::new(self.iter().map(|(_, v)| v as &'b HBData))
+  }
+
+  fn iter<'b>(&'b self) -> HBIter<'b> {
+    Box::new(self.data.iter().chain(self.options.iter().map(|(&s, &v)| (s, v)))) as HBIter<'b>
   }
 }
 
@@ -427,7 +427,6 @@ pub struct HelperOptions<'a> {
   pub condition: bool,
   global_data: &'a HashMap<&'a str, &'a (HBData + 'a)>,
   context_stack: &'a Vec<&'a (HBData + 'a)>,
-  // options: HelperOptionsByName<'a>,
   options: &'a [(String, HBValHolder)],
 }
 
@@ -865,18 +864,18 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(entries: &'a Entries, data: &'a HBD
                     },
                     HBNodeType::Array(_) => {
                       let inverse = render_options.inverse;
-                      let collection: Vec<&HBData> = match c.as_array() {
-                        Some(ref a) if inverse &&  a.is_empty() => vec![&eval_context.falsy],
-                        Some(ref a) if inverse && !a.is_empty() => vec![],
+                      let (len, _) = c.values().size_hint();
 
-                        Some(a) => if !inverse { a } else { vec![] },
-
-                        None if inverse =>  vec![&eval_context.falsy],
-                        None => vec![],
+                      let collection_iter: HBValuesIter = match (0 >= len, inverse) {
+                        (true,  true)  => Box::new(Some(&eval_context.falsy as &HBData).into_iter()),
+                        (false, true)  => Box::new(None.into_iter()),
+                        (_, false) => c.values(),
                       };
 
-                      if ! collection.is_empty() {
-                        for array_i in collection.iter().rev() {
+                      let (c_len, _) = collection_iter.size_hint();
+
+                      if c_len > 0 {
+                        for array_i in collection_iter.collect::<Vec<_>>().iter().rev() {
                           for e in block_found.iter().rev() {
                             let mut c_stack = ctxt_stack.clone();
                             c_stack.push(*ctxt);

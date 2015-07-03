@@ -27,14 +27,17 @@ pub fn unless_helper(_: &[&HBData], options: &HelperOptions, out: &mut SafeWriti
 pub fn each_helper(params: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, _: &EvalContext) -> HBEvalResult {
   let use_context = params.first().map(|&c| c).unwrap_or(options.context);
 
-  match use_context.as_array() {
-    Some(array) => {
-      if array.len() > 0 {
+  match use_context.typed_node() {
+    ::eval::HBNodeType::Array(_) => {
+      let values = use_context.values();
+      let (len, _) = values.size_hint();
+
+      if len > 0 {
         let mut r = Ok(());
-        for (index, item) in array.iter().enumerate() {
+        for (index, item) in values.enumerate() {
           let d_index = index.to_json();
           let first = (index == 0).to_json();
-          let last = (index == array.len()-1).to_json();
+          let last = (index == len-1).to_json();
 
           let mut each_globs = HashMap::new();
 
@@ -42,7 +45,7 @@ pub fn each_helper(params: &[&HBData], options: &HelperOptions, out: &mut SafeWr
           each_globs.insert("@first", &first as &HBData);
           each_globs.insert("@last", &last as &HBData);
 
-          r = options.render_fn_with_context_and_globals(*item, out, &each_globs);
+          r = options.render_fn_with_context_and_globals(item, out, &each_globs);
 
           if r.is_err() {
             break;
@@ -53,14 +56,16 @@ pub fn each_helper(params: &[&HBData], options: &HelperOptions, out: &mut SafeWr
         options.inverse(out)
       }
     },
-    None => if let Some(keys) = use_context.keys() {
-      if keys.len() > 0 {
+    ::eval::HBNodeType::Branch(_) => {
+      let keys = use_context.keys();
+      let (len, _) = keys.size_hint();
+      if len > 0 {
         let mut r = Ok(());
-        for (index, &key) in keys.iter().enumerate() {
-          if let Some(o) = options.context.get_key(key) {
+        for (index, ref key) in keys.enumerate() {
+          if let Some(o) = options.context.get_key(&key) {
             let key = key.to_string();
             let first = (index == 0).to_json();
-            let last = (index == keys.len()-1).to_json();
+            let last = (index == len-1).to_json();
 
             let mut each_globs = HashMap::new();
 
@@ -79,7 +84,8 @@ pub fn each_helper(params: &[&HBData], options: &HelperOptions, out: &mut SafeWr
       } else {
         options.inverse(out)
       }
-    } else {
+    },
+    ::eval::HBNodeType::Leaf(_) | ::eval::HBNodeType::Null => {
       options.render_fn(out)
     },
   }
