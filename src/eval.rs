@@ -409,7 +409,7 @@ impl <'a> HBData for FallbackToOptions<'a> {
   }
 }
 
-pub type HelperFunction = fn(params: &[&HBData], options: &HelperOptions, out: &mut SafeWriting, hb_context: &EvalContext) -> HBEvalResult;
+pub type HelperFunction = Box<Fn(&[&HBData], &HelperOptions, &mut SafeWriting, &EvalContext) -> HBEvalResult>;
 
 pub struct Helper {
   helper_func: HelperFunction,
@@ -638,11 +638,11 @@ impl Default for EvalContext {
   fn default() -> EvalContext {
     let mut helpers = HashMap::new();
 
-    helpers.insert("each".to_string(),   Helper::new_with_function(::helpers_builtins::each_helper));
-    helpers.insert("if".to_string(),     Helper::new_with_function(::helpers_builtins::if_helper));
-    helpers.insert("unless".to_string(), Helper::new_with_function(::helpers_builtins::unless_helper));
-    helpers.insert("lookup".to_string(), Helper::new_with_function(::helpers_builtins::lookup_helper));
-    helpers.insert("with".to_string(),   Helper::new_with_function(::helpers_builtins::with_helper));
+    helpers.insert("each".to_string(),   Helper::new_with_function(Box::new(::helpers_builtins::each_helper)));
+    helpers.insert("if".to_string(),     Helper::new_with_function(Box::new(::helpers_builtins::if_helper)));
+    helpers.insert("unless".to_string(), Helper::new_with_function(Box::new(::helpers_builtins::unless_helper)));
+    helpers.insert("lookup".to_string(), Helper::new_with_function(Box::new(::helpers_builtins::lookup_helper)));
+    helpers.insert("with".to_string(),   Helper::new_with_function(Box::new(::helpers_builtins::with_helper)));
 
     EvalContext {
       partials: Default::default(),
