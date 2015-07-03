@@ -302,7 +302,6 @@ fn helper_closure() {
   eval(&tmpl, &json, &mut buf, &eval_ctxt).unwrap();
 
   assert_eq!(String::from_utf8(buf).unwrap(), "pouet");
-
 }
 
 #[allow(unused_variables)]
@@ -425,4 +424,31 @@ fn safe_writing_help() {
 
 
   assert_eq!(String::from_utf8(buf).ok().unwrap(), "pouet∂ pouet")
+}
+
+#[allow(unused_variables)]
+#[test]
+fn helper_quickdoc_closure() {
+  let json = Json::Null;
+  let tmpl = parse(r##"{{example_helper}}"##).ok().unwrap();
+
+  let mut eval_ctxt: EvalContext = Default::default();
+  let mut buf = Vec::<u8>::new();
+
+  eval_ctxt.register_helper("example_helper".to_string(), Box::new(|params, options, out, hb_context| {
+    let mut buf = Vec::<u8>::new();
+    let res = SafeWriting::with_html_safe_writer(&mut buf, &|out| {
+        "pouet pouet".to_string().write_value(out)
+    });
+
+    if res.is_err() { return res; };
+
+   let mut s = String::from_utf8(buf).ok().unwrap();
+    s.insert(5, '∂');
+    s.write_value(out)
+  }));
+
+  eval(&tmpl, &json, &mut buf, &eval_ctxt).ok();
+
+  assert_eq!(String::from_utf8(buf).unwrap(), "pouet∂ pouet");
 }

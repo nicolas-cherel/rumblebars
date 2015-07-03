@@ -44,28 +44,7 @@ fn main() {
 
 ## helpers
 
-Helpers are registered to the evaluation context. They are simple bare function (probably Fn() in the future), that have to write their content on the `out: &mut Writer`. If you need to processed content before rendering it to the final `Writer`, just render it to a buffer put into a safe writter.
-
-example:
-
-```rust
-fn example_helper(
-  params: &[&HBData], options: &HelperOptions,
-  out: &mut SafeWriting, hb_context: &EvalContext
-) -> HBEvalResult
-{
-	let mut buf = Vec::<u8>::new();
-	let res = SafeWriting::with_html_safe_writer(&mut buf, &|out| {
-		"pouet pouet".to_string().write_value(out)
-	});
-
-	if !res.ok() { return res; };
-
-   let mut s = String::from_utf8(buf).ok().unwrap();
-	s.insert(5, '∂');
-	s.write_value(out)
-}
-```
+Helpers are registered to the evaluation context. They are boxed closures (you can hold bare function in them too) that have to write their content on the `out: &mut Writer`. If you need to processed content before rendering it to the final `Writer`, just render it to a buffer put into a safe writter.
 
 To use your hepler you just have to register it before evaluating your template:
 
@@ -76,8 +55,17 @@ let tmpl = parse(r##"{{example_helper}}"##).ok().unwrap();
 let mut eval_ctxt: EvalContext = Default::default();
 let mut buf = Vec::<u8>::new();
 
-eval_ctxt.register_helper("example_helper".to_string(), example_helper);
+eval_ctxt.register_helper("example_helper".to_string(), Box::new(|params, options, out, hb_context| {
+  let mut buf = Vec::<u8>::new();
+  let res = SafeWriting::with_html_safe_writer(&mut buf, &|out| {
+      "pouet pouet".to_string().write_value(out)
+  });
 
-eval(&tmpl, &json, &mut buf, &eval_ctxt).ok();
+  if res.is_err() { return res; };
+
+ let mut s = String::from_utf8(buf).ok().unwrap();
+  s.insert(5, '∂');
+  s.write_value(out)
+}));
 
 ```
