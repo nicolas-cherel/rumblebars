@@ -78,6 +78,11 @@ fn value_for_key_path_in_context<'a>(
   return ctxt;
 }
 
+/// enum to qualify data node type,
+/// Branch for key/values assoc
+/// Array for collection
+/// Leaf for scalar-like data
+/// Null Special Leaf that holds nothing
 pub enum HBNodeType<T> {
   Branch(T),
   Array(T),
@@ -434,14 +439,17 @@ pub struct Helper {
 
 pub type HelperOptionsByName<'a> = HashMap<&'a String, &'a (HBData + 'a)>;
 
-// alow dead, only used from user defined helpers
-#[allow(dead_code)]
+
+/// Provides rendering and lookup features to registered helpers
+#[allow(dead_code)] // alow dead, only used from user defined helpers
 pub struct HelperOptions<'a> {
+  /// current expansion data context
+  pub context: &'a (HBData + 'a),
+  /// if a parameter was given to helper, holds the result of its truthy/falsy evaluation
+  pub condition: bool,
   block: Option<&'a Entries>,
   inverse: Option<&'a Entries>,
-  pub context: &'a (HBData + 'a),
   hb_context: &'a EvalContext,
-  pub condition: bool,
   global_data: &'a HashMap<&'a str, &'a (HBData + 'a)>,
   context_stack: &'a Vec<&'a (HBData + 'a)>,
   options: &'a [(String, HBValHolder)],
@@ -480,6 +488,7 @@ impl <'a> HelperOptions<'a> {
 
   }
 
+  /// data passed as options (eg `{{helper option="one" option=name.val}}`)
   pub fn option_by_name(&self, name: &String) -> Option<&'a(HBData + 'a)> {
     match self.options.iter().find(|&&(ref n, _)| { n == name }) {
       Some(&(_, HBValHolder::String(ref s))) => Some(s as &HBData),
@@ -488,10 +497,29 @@ impl <'a> HelperOptions<'a> {
     }
   }
 
+  /// fetch data at given path
+  ///
+  /// # Examples
+  ///
+  /// ```
+  /// use rumblebars::EvalContext;
+  ///
+  /// let mut context = EvalContext::new();
+  ///
+  /// context.register_helper("fetch_hello".to_string(), Box::new(
+  ///   |params, options, out, hb_context| {
+  ///     // if context is {"hello": {"content": "hi"}}, returns Some("hi")
+  ///     options.lookup(&"hello.content");
+  ///     Ok(())
+  /// }));
+  /// ```
+
   pub fn lookup(&self, key: &HBData) -> Option<&'a (HBData + 'a)> {
     self.lookup_with_context(key, self.context)
   }
 
+
+  /// same as lookup, but with custom context instead of current one (this)
   pub fn lookup_with_context(&self, key: &HBData, context: &HBData) -> Option<&'a (HBData + 'a)>  {
     let mut buf:Vec<u8> = vec![];
     let key_write_ok = {
@@ -512,21 +540,45 @@ impl <'a> HelperOptions<'a> {
     }
   }
 
+  /// for a helper with a block, such as `{{if}}{{/if}}`, renders block content
   pub fn render_fn(&self, out: &mut SafeWriting) -> HBEvalResult{
       self.render_template(self.block, self.context, out)
   }
 
+  /// same as render_fn, but with custom context
   pub fn render_fn_with_context(&self, data: &HBData, out: &mut SafeWriting) -> HBEvalResult{
       self.render_template(self.block, unsafe { ::std::mem::transmute(data) }, out)
   }
 
+  /// for a helpers with blocks, such as `{{if}}{{else}}{{/if}}`, renders the `{{else}}` block content
   pub fn inverse(&self, out: &mut SafeWriting) -> HBEvalResult{
       self.render_template(self.inverse, self.context, out)
   }
 
+  /// same as inverse, but with custom context
   pub fn inverse_with_context(&self, data: &'a HBData, out: &mut SafeWriting) -> HBEvalResult{
       self.render_template(self.inverse, data, out)
   }
+
+  /// allow block rendering with custom context and custom globals (data available with @key)
+  ///
+  /// # Examples
+  ///
+  /// ```
+  /// use rumblebars::EvalContext;
+  /// use rumblebars::HBData;
+  /// use ::std::default::Default;
+  ///
+  /// let mut context: EvalContext = Default::default();
+  /// let data = "Some Data".to_string();
+  /// context.register_helper("fetch_hello".to_string(), Box::new(
+  ///   move |params, options, out, hb_context| {
+  ///     let mut globals = ::std::collections::HashMap::<&str, &HBData>::new();
+  ///     globals.insert("@some_key", &data);
+  ///     // if block contains {{@some_key}}, it'll expand to 'Some Data'
+  ///     options.render_fn_with_context_and_globals(options.context, out, &globals)
+  /// }));
+  /// ```
 
   pub fn render_fn_with_context_and_globals(&self, data: &HBData, out: &mut SafeWriting, globals: &HashMap<&str, &HBData>) -> HBEvalResult {
     let mut h = HashMap::new();
@@ -643,10 +695,11 @@ impl Helper {
 
 }
 
-
+/// Stores partials, helpers and configuration flags
 pub struct EvalContext {
   partials: HashMap<String, Template>,
   helpers: HashMap<String, Helper>,
+  /// mustache compatibility flag, to enable recursive lookups
   pub compat: bool,
   falsy: Json,
 }
@@ -676,26 +729,69 @@ impl EvalContext {
     Default::default()
   }
 
+  /// Map of registered partials
   pub fn partials(&self) -> &HashMap<String, Template> {
     return &self.partials;
   }
 
+  /// adds a partial in the evaluation context
+  ///
+  /// # Examples
+  /// ```
+  /// # extern crate rustc_serialize as serialize;
+  /// # extern crate rumblebars;
+  /// # fn main() {
+  /// use rumblebars::Template;
+  /// use rumblebars::EvalContext;
+  /// use serialize::json::Json;
+  ///
+  /// let mut context = EvalContext::new();
+  /// let mut say_hi = String::new();
+  /// let sample: Json = r##"{"hello": "hi"}"##.parse().unwrap();
+  /// let mut buf = say_hi.into_bytes();
+  ///
+  /// context.register_partial("greet".to_string(), "say {{hello}}".parse().unwrap());
+  ///
+  /// Template::new("{{>greet}}").unwrap().eval(&sample, &mut buf, &context).unwrap();
+  ///
+  /// say_hi = String::from_utf8(buf).unwrap();
+  ///
+  /// assert_eq!(say_hi, "say hi")
+  /// # }
+  /// ```
   pub fn register_partial(&mut self, name: String, t: Template) {
     self.partials.insert(name, t);
   }
 
+  /// fetch a registered partial by name
   pub fn partial_with_name(&self, name: &str) -> Option<&Template> {
     return self.partials.get(name);
   }
 
+
+  /// adds a helper to the evaluation context
+  ///
+  /// ```
+  /// use rumblebars::EvalContext;
+  /// use rumblebars::HBData; // for write_value
+  ///
+  /// let mut context = EvalContext::new();
+  ///
+  /// context.register_helper("hello".to_string(), Box::new(
+  ///   |params, options, out, hb_context| {
+  ///     "hi".write_value(out)
+  /// }));
+  /// ```
   pub fn register_helper(&mut self, name: String, h: HelperFunction) {
     self.helpers.insert(name, Helper::new_with_function(h));
   }
 
+  /// fetch a registered helper by name
   pub fn helper_with_name(&self, name: &str) -> Option<&Helper> {
     return self.helpers.get(name);
   }
 
+  /// true if a helper with given name is registered
   pub fn has_helper_with_name(&self, name: &str) -> bool {
     return self.helpers.contains_key(name);
   }

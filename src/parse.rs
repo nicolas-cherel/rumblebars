@@ -331,7 +331,6 @@ use super::{HBData, HBEvalResult, EvalContext, eval};
 ///
 /// You can control the EvalContext (for custom helpers) and output using `eval()`
 ///
-///
 /// ```
 /// use rumblebars::Template;
 /// use rumblebars::HBData;
