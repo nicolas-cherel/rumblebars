@@ -282,14 +282,112 @@ impl HBEntry {
 }
 
 pub type Entries = Vec<Box<HBEntry>>;
+pub type ParseResult = Result<Template, (ParseError, Option<String>)>;
+
+
+
+use std::io;
+use super::{HBData, HBEvalResult, EvalContext, eval};
+
+
+///
+/// Internal representation of a handlebars template used for
+/// later expansion.
+///
+/// Provides API shortcuts, parsing and expanding are internally
+/// processed by [`::rumblebars::parse()`](fn.parse.html) and
+/// [`::rumblebars::eval()`](fn.eval.html).
+///
+/// # Examples
+///
+/// The API shortcuts are provided by object oriented
+/// code design.
+///
+/// You can render directly into a String :
+///
+/// ```
+/// extern crate rustc_serialize as serialize;
+/// extern crate rumblebars;
+/// # fn main() {
+/// use serialize::json::Json;
+/// use rumblebars::Template;
+///
+/// let data = Json::from_str(r##"{"hello": "hi"}"##).unwrap();
+///
+/// if let Ok(template) = Template::new("{{hello}}") {
+///   let res = template.eval_to_string(&data).unwrap_or("".to_string());
+///   assert_eq!(&res, "hi");
+/// }
+/// # else { panic!("should not reach") }
+/// # }
+/// ```
+///
+/// For template parsing, you can also use rust's usual patterns that leverage type inference :
+///
+/// ```
+/// use rumblebars::Template;
+/// let template: Template = "{{hello}}".parse().unwrap(); // thanks to FromStr
+/// ```
+///
+/// You can control the EvalContext (for custom helpers) and output using `eval()`
+///
+///
+/// ```
+/// use rumblebars::Template;
+/// use rumblebars::HBData;
+/// use rumblebars::EvalContext;
+/// use ::std::default::Default;
+///
+/// if let Ok(template) = Template::new("{{hello}}") {
+///   let mut context: EvalContext = Default::default();
+///   let mut buf = Vec::new();
+///
+///   context.register_helper("hello".to_string(), Box::new(
+///     |params, options, out, hb_context| {
+///       "hi".write_value(out)
+///   }));
+///
+///   if let Ok(_) = template.eval(&"", &mut buf, &context) {
+///      assert_eq!(String::from_utf8_lossy(&buf), "hi");
+///   }
+/// }
+/// # else { panic!("should not reach") }
+/// ```
+
+
 
 pub struct Template {
   pub entries: Entries
 }
 
+impl Template {
+  pub fn new(template: &str) -> ParseResult {
+    parse(template)
+  }
+
+  pub fn eval_to_string(&self, data: &HBData) -> Option<String> {
+    let mut buf = Vec::new();
+    self.eval(data, &mut buf, &Default::default()).ok().and_then(|_| String::from_utf8(buf).ok())
+  }
+
+  pub fn eval(&self, data: &HBData, out: &mut io::Write, eval_context: &EvalContext)  -> HBEvalResult {
+    eval(&self, data, out, eval_context)
+  }
+}
+
+/// only used internaly
 impl ::std::default::Default for Template {
   fn default() -> Template {
     Template { entries: ::std::default::Default::default() }
+  }
+}
+
+/// for `"{{hello}}".parse()` expressions
+impl ::std::str::FromStr for Template {
+  type Err = (ParseError, Option<String>);
+
+  fn from_str(s: &str) -> Result<Self, <Self as ::std::str::FromStr>::Err> {
+    parse(s)
   }
 }
 
@@ -456,13 +554,34 @@ fn append_entry(stack: &mut Vec<(Box<Entries>, bool)>, e: Box<HBEntry>) {
   }
 }
 
-pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
+/// Parses a handlebars template.
+///
+///
+/// # Failures
+///
+/// Handlebars syntax does not have much corner cases, so hopefully
+/// you won't get much cryptic cases. The most painfull ones are
+/// unmatched blocks opening/closing, this class of errors comes with
+/// a short description.
+///
+/// # Examples
+///
+/// Provided that you have continous integration with tests on your code,
+/// unwraping is safe for static inline templates.
+///
+/// ```
+/// ::rumblebars::parse("{{hello}}").unwrap();
+/// ```
+///
+/// Otherwise check for errors.
+///
+/// ```
+/// assert!(::rumblebars::parse("{{#hello}}{{/end}}").is_err());
+/// ```
+
+pub fn parse(template: &str) -> ParseResult {
   // trimming template handling with a regex, as rustlex does not emit tokens on input end,
   // but it's very (very) convenient for this case
-
-  // general case,
-  ;
-  // partial case
 
   let trimmed = END_WP_TRIMMER.replace_all(&template,"$1$2");
   let trimmed = PARTIAL_END_WP_TRIMMER.replace_all(&trimmed,"$1$2");
@@ -752,15 +871,6 @@ pub fn parse(template: &str) -> Result<Template, (ParseError, Option<String>)> {
     Result::Ok(Template { entries: *stack.remove(0).0 })
   } else {
     Result::Err((ParseError::UnkownError, None))
-  }
-}
-
-use ::std::str::FromStr;
-impl FromStr for Template {
-  type Err = (ParseError, Option<String>);
-
-  fn from_str(s: &str) -> Result<Self, <Self as FromStr>::Err> {
-    parse(s)
   }
 }
 

@@ -23,7 +23,6 @@ syntex          = { version = "*", optional = true }
 
 [lib]
 name    = "rumblebars"
-doctest = false
 
 [dependencies]
 rustc-serialize = "0.3"

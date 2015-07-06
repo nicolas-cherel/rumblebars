@@ -8,7 +8,7 @@ pub fn main() {
 
     let mut registry = syntex::Registry::new();
     rustlex_codegen::plugin_registrar(&mut registry);
-    let src = Path::new("src/parse.lex.rs");
+    let src = Path::new("src/parse.rs");
     let dst = Path::new(&env::var_os("OUT_DIR").unwrap()).join("parse.rs");
     registry.expand("", &src, &dst).unwrap();
 }

@@ -361,7 +361,24 @@ impl HBData for String {
     HBNodeType::Leaf(self as &HBData)
   }
 
-  fn as_bool(&self) -> bool { &self[..] == "" }
+  fn as_bool(&self) -> bool { &self[..] != "" }
+
+  fn get_key<'a>(&'a self, _: &str) -> Option<&'a HBData> { None }
+  fn keys<'a>(&'a self) -> HBKeysIter<'a> { Box::new(None.into_iter()) }
+  fn values<'a>(&'a self) -> HBValuesIter<'a> { Box::new(None.into_iter()) }
+  fn iter<'a>(&'a self) -> HBIter<'a> { Box::new(None.into_iter()) }
+}
+
+impl<'b> HBData for &'b str {
+  fn write_value(&self, out: &mut SafeWriting) -> HBEvalResult {
+    write!(out, "{}", self)
+  }
+
+  fn typed_node<'a>(&'a self) -> HBNodeType<&'a HBData> {
+    HBNodeType::Leaf(self as &HBData)
+  }
+
+  fn as_bool(&self) -> bool { *self != "" }
 
   fn get_key<'a>(&'a self, _: &str) -> Option<&'a HBData> { None }
   fn keys<'a>(&'a self) -> HBKeysIter<'a> { Box::new(None.into_iter()) }

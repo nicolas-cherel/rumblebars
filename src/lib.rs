@@ -1,16 +1,17 @@
+//! This crates provides a library for parsing and expanding handlebars template
+//! to use with rust nighly feature build with ```cargo build --features nightly --no-default-features```
+
 #![crate_name="rumblebars"]
 
 #![cfg_attr(feature = "nightly", feature(test))]
-#![cfg_attr(not(feature = "with-syntex"), feature(plugin))]
-#![cfg_attr(not(feature = "with-syntex"), plugin(rustlex))]
+#![cfg_attr(feature = "nightly", feature(plugin))]
+#![cfg_attr(feature = "nightly", plugin(rustlex))]
 
 #[cfg(feature = "with-syntex")] extern crate rustlex_codegen as rustlex;
-#[cfg(not(feature = "with-syntex"))] #[warn(plugin_as_library)] extern crate rustlex;
+#[cfg(feature = "nightly")] #[warn(plugin_as_library)] extern crate rustlex;
 
-mod parse {
-  #[cfg(not(feature = "with-syntex"))] include!("parse.lex.rs");
-  #[cfg(feature = "with-syntex")] include!(concat!(env!("OUT_DIR"), "/parse.rs"));
-}
+#[cfg(feature = "with-syntex")] mod parse { include!(concat!(env!("OUT_DIR"), "/parse.rs")); }
+#[cfg(feature = "nightly")] mod parse;
 
 
 extern crate regex;
