@@ -1,0 +1,10 @@
+(function() {var implementors = {};
+implementors['rumblebars'] = ["impl <a class='trait' href='http://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html' title='core::cmp::PartialEq'>PartialEq</a>&lt;<a class='struct' href='http://doc.rust-lang.org/regex/regex/char/struct.Char.html' title='regex::char::Char'>Char</a>&gt; for <a class='struct' href='http://doc.rust-lang.org/regex/regex/char/struct.Char.html' title='regex::char::Char'>Char</a>","impl <a class='trait' href='http://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html' title='core::cmp::PartialEq'>PartialEq</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.char.html'>char</a>&gt; for <a class='struct' href='http://doc.rust-lang.org/regex/regex/char/struct.Char.html' title='regex::char::Char'>Char</a>","impl <a class='trait' href='http://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html' title='core::cmp::PartialEq'>PartialEq</a>&lt;<a class='struct' href='http://doc.rust-lang.org/regex/regex/char/struct.Char.html' title='regex::char::Char'>Char</a>&gt; for <a href='http://doc.rust-lang.org/nightly/std/primitive.char.html'>char</a>","impl <a class='trait' href='http://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html' title='core::cmp::PartialEq'>PartialEq</a>&lt;<a class='enum' href='http://doc.rust-lang.org/regex/regex/program/enum.LookInst.html' title='regex::program::LookInst'>LookInst</a>&gt; for <a class='enum' href='http://doc.rust-lang.org/regex/regex/program/enum.LookInst.html' title='regex::program::LookInst'>LookInst</a>","impl <a class='trait' href='http://doc.rust-lang.org/nightly/core/cmp/trait.PartialEq.html' title='core::cmp::PartialEq'>PartialEq</a>&lt;<a class='enum' href='http://doc.rust-lang.org/regex/regex/re/enum.Regex.html' title='regex::re::Regex'>Regex</a>&gt; for <a class='enum' href='http://doc.rust-lang.org/regex/regex/re/enum.Regex.html' title='regex::re::Regex'>Regex</a>",];
+
+            if (window.register_implementors) {
+                window.register_implementors(implementors);
+            } else {
+                window.pending_implementors = implementors;
+            }
+        
+})()
