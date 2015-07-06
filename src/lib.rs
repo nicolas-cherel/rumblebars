@@ -23,16 +23,16 @@ extern crate rustc_serialize as serialize;
 #[macro_use]
 extern crate lazy_static;
 
-
 pub use self::parse::parse;
 pub use self::parse::ParseError;
 pub use self::parse::Template;
-pub use self::parse::HBValHolder;
 pub use self::eval::eval;
 pub use self::eval::HBData;
+pub use self::eval::HBIter;
+pub use self::eval::HBKeysIter;
+pub use self::eval::HBValuesIter;
 pub use self::eval::HBEvalResult;
 pub use self::eval::EvalContext;
-pub use self::eval::Helper;
 pub use self::eval::HelperOptions;
 pub use self::eval::HelperOptionsByName;
 pub use self::eval::SafeWriting;
