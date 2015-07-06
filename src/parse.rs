@@ -336,10 +336,9 @@ use super::{HBData, HBEvalResult, EvalContext, eval};
 /// use rumblebars::Template;
 /// use rumblebars::HBData;
 /// use rumblebars::EvalContext;
-/// use ::std::default::Default;
 ///
 /// if let Ok(template) = Template::new("{{hello}}") {
-///   let mut context: EvalContext = Default::default();
+///   let mut context = EvalContext::new();
 ///   let mut buf = Vec::new();
 ///
 ///   context.register_helper("hello".to_string(), Box::new(

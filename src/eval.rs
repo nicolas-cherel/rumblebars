@@ -671,6 +671,11 @@ impl Default for EvalContext {
 }
 
 impl EvalContext {
+  /// just return a default EvalContext without having to declare use of std:default
+  pub fn new() -> EvalContext {
+    Default::default()
+  }
+
   pub fn partials(&self) -> &HashMap<String, Template> {
     return &self.partials;
   }
