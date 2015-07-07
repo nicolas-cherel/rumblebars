@@ -1234,60 +1234,6 @@
 <span id="1192">1192</span>
 <span id="1193">1193</span>
 <span id="1194">1194</span>
-<span id="1195">1195</span>
-<span id="1196">1196</span>
-<span id="1197">1197</span>
-<span id="1198">1198</span>
-<span id="1199">1199</span>
-<span id="1200">1200</span>
-<span id="1201">1201</span>
-<span id="1202">1202</span>
-<span id="1203">1203</span>
-<span id="1204">1204</span>
-<span id="1205">1205</span>
-<span id="1206">1206</span>
-<span id="1207">1207</span>
-<span id="1208">1208</span>
-<span id="1209">1209</span>
-<span id="1210">1210</span>
-<span id="1211">1211</span>
-<span id="1212">1212</span>
-<span id="1213">1213</span>
-<span id="1214">1214</span>
-<span id="1215">1215</span>
-<span id="1216">1216</span>
-<span id="1217">1217</span>
-<span id="1218">1218</span>
-<span id="1219">1219</span>
-<span id="1220">1220</span>
-<span id="1221">1221</span>
-<span id="1222">1222</span>
-<span id="1223">1223</span>
-<span id="1224">1224</span>
-<span id="1225">1225</span>
-<span id="1226">1226</span>
-<span id="1227">1227</span>
-<span id="1228">1228</span>
-<span id="1229">1229</span>
-<span id="1230">1230</span>
-<span id="1231">1231</span>
-<span id="1232">1232</span>
-<span id="1233">1233</span>
-<span id="1234">1234</span>
-<span id="1235">1235</span>
-<span id="1236">1236</span>
-<span id="1237">1237</span>
-<span id="1238">1238</span>
-<span id="1239">1239</span>
-<span id="1240">1240</span>
-<span id="1241">1241</span>
-<span id="1242">1242</span>
-<span id="1243">1243</span>
-<span id="1244">1244</span>
-<span id="1245">1245</span>
-<span id="1246">1246</span>
-<span id="1247">1247</span>
-<span id="1248">1248</span>
 </pre><pre class='rust '>
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>io</span>::<span class='ident'>BufReader</span>;
 <span class='kw'>use</span> <span class='ident'>serialize</span>::<span class='ident'>json</span>::<span class='ident'>Json</span>;
@@ -1589,61 +1535,7 @@
 <span class='doccomment'>/// processed by [`::rumblebars::parse()`](fn.parse.html) and</span>
 <span class='doccomment'>/// [`::rumblebars::eval()`](fn.eval.html).</span>
 <span class='doccomment'>///</span>
-<span class='doccomment'>/// # Examples</span>
-<span class='doccomment'>///</span>
-<span class='doccomment'>/// The API shortcuts are provided by object oriented</span>
-<span class='doccomment'>/// code design.</span>
-<span class='doccomment'>///</span>
-<span class='doccomment'>/// You can render directly into a String :</span>
-<span class='doccomment'>///</span>
-<span class='doccomment'>/// ```</span>
-<span class='doccomment'>/// extern crate rustc_serialize as serialize;</span>
-<span class='doccomment'>/// extern crate rumblebars;</span>
-<span class='doccomment'>/// # fn main() {</span>
-<span class='doccomment'>/// use serialize::json::Json;</span>
-<span class='doccomment'>/// use rumblebars::Template;</span>
-<span class='doccomment'>///</span>
-<span class='doccomment'>/// let data = Json::from_str(r##&quot;{&quot;hello&quot;: &quot;hi&quot;}&quot;##).unwrap();</span>
-<span class='doccomment'>///</span>
-<span class='doccomment'>/// if let Ok(template) = Template::new(&quot;{{hello}}&quot;) {</span>
-<span class='doccomment'>///   let res = template.eval_to_string(&amp;data).unwrap_or(&quot;&quot;.to_string());</span>
-<span class='doccomment'>///   assert_eq!(&amp;res, &quot;hi&quot;);</span>
-<span class='doccomment'>/// }</span>
-<span class='doccomment'>/// # else { panic!(&quot;should not reach&quot;) }</span>
-<span class='doccomment'>/// # }</span>
-<span class='doccomment'>/// ```</span>
-<span class='doccomment'>///</span>
-<span class='doccomment'>/// For template parsing, you can also use rust&#39;s usual patterns that leverage type inference :</span>
-<span class='doccomment'>///</span>
-<span class='doccomment'>/// ```</span>
-<span class='doccomment'>/// use rumblebars::Template;</span>
-<span class='doccomment'>/// let template: Template = &quot;{{hello}}&quot;.parse().unwrap(); // thanks to FromStr</span>
-<span class='doccomment'>/// ```</span>
-<span class='doccomment'>///</span>
-<span class='doccomment'>/// You can control the EvalContext (for custom helpers) and output using `eval()`</span>
-<span class='doccomment'>///</span>
-<span class='doccomment'>/// ```</span>
-<span class='doccomment'>/// use rumblebars::Template;</span>
-<span class='doccomment'>/// use rumblebars::HBData;</span>
-<span class='doccomment'>/// use rumblebars::EvalContext;</span>
-<span class='doccomment'>///</span>
-<span class='doccomment'>/// if let Ok(template) = Template::new(&quot;{{hello}}&quot;) {</span>
-<span class='doccomment'>///   let mut context = EvalContext::new();</span>
-<span class='doccomment'>///   let mut buf = Vec::new();</span>
-<span class='doccomment'>///</span>
-<span class='doccomment'>///   context.register_helper(&quot;hello&quot;.to_string(), Box::new(</span>
-<span class='doccomment'>///     |params, options, out, hb_context| {</span>
-<span class='doccomment'>///       &quot;hi&quot;.write_value(out)</span>
-<span class='doccomment'>///   }));</span>
-<span class='doccomment'>///</span>
-<span class='doccomment'>///   if let Ok(_) = template.eval(&amp;&quot;&quot;, &amp;mut buf, &amp;context) {</span>
-<span class='doccomment'>///      assert_eq!(String::from_utf8_lossy(&amp;buf), &quot;hi&quot;);</span>
-<span class='doccomment'>///   }</span>
-<span class='doccomment'>/// }</span>
-<span class='doccomment'>/// # else { panic!(&quot;should not reach&quot;) }</span>
-<span class='doccomment'>/// ```</span>
-
-
+<span class='doccomment'>/// (see crate docs)</span>
 
 <span class='kw'>pub</span> <span class='kw'>struct</span> <span class='ident'>Template</span> {
   <span class='kw'>pub</span> <span class='ident'>entries</span>: <span class='ident'>Entries</span>

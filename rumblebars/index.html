@@ -45,9 +45,92 @@
             <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                 [<span class='inner'>&#x2212;</span>]
             </a>
-        </span><a id='src-0' class='srclink' href='../src/rumblebars/lib.rs.html#1-41' title='goto source code'>[src]</a></span></h1>
-<div class='docblock'><p>This crates provides a library for parsing and expanding handlebars template
-to use with rust nighly feature build with <code>cargo build --features nightly --no-default-features</code></p>
+        </span><a id='src-0' class='srclink' href='../src/rumblebars/lib.rs.html#1-138' title='goto source code'>[src]</a></span></h1>
+<div class='docblock'><p><a href="https://travis-ci.org/nicolas-cherel/rumblebars"><img src="https://travis-ci.org/nicolas-cherel/rumblebars.svg?branch=master" alt="Build Status"></a></p>
+
+<h1 id="rumblebars-—-a-handlebars-template-expansion-library" class='section-header'><a
+                           href="#rumblebars-—-a-handlebars-template-expansion-library">rumblebars — a handlebars template expansion library</a></h1>
+<p>This crates provides a library for parsing and expanding handlebars template</p>
+
+<p>to use with rust nighly feature build with <code>cargo build --features nightly --no-default-features</code></p>
+
+<p>Rumblebars passes <strong>all mustaches specs</strong> <a href="#1">[1]</a> and <strong>272 handlebars tests</strong> <a href="#2">[2]</a>. Template evaluation is rendered to a <code>io::Writer</code>, so that you can choose wether if you hold result in memory or not. It also input data angostic, given that your data structure implements the <code>HBData</code> trait (Json implementation provided).</p>
+
+<p>[1] <a name="1"></a> except delimiter changes test suite and one test failing because of a trailing space<br>
+ [2] <a name="2"></a> all tests that does not involves javascript in data and partials, and see the <a href="https://github.com/nicolas-cherel/rumblebars/blob/master/tests/eval/handlebars.rs#L88-L134">comments for other cases</a></p>
+
+<h2 id="hmtl-escaping-safety" class='section-header'><a
+                           href="#hmtl-escaping-safety">HMTL escaping safety</a></h2>
+<p>All output is filtered by being written to the <code>SafeWriting</code> trait. Helpers, just as regular evaluation do for unescaped content, have to opt out escaped writing by calling <code>SafeWriting::into_unsafe()</code> that will return the underlying unfiltered writer.</p>
+
+<h2 id="quick-start" class='section-header'><a
+                           href="#quick-start">Quick start</a></h2>
+<h1 id="examples" class='section-header'><a
+                           href="#examples">Examples</a></h1>
+<p>The API shortcuts are provided by object oriented
+code design.</p>
+
+<p>You can render directly into a String :</p>
+<pre class='rust rust-example-rendered'>
+<span class='kw'>extern</span> <span class='kw'>crate</span> <span class='ident'>rustc_serialize</span> <span class='kw'>as</span> <span class='ident'>serialize</span>;
+<span class='kw'>extern</span> <span class='kw'>crate</span> <span class='ident'>rumblebars</span>;
+<span class='kw'>use</span> <span class='ident'>serialize</span>::<span class='ident'>json</span>::<span class='ident'>Json</span>;
+<span class='kw'>use</span> <span class='ident'>rumblebars</span>::<span class='ident'>Template</span>;
+
+<span class='kw'>let</span> <span class='ident'>data</span> <span class='op'>=</span> <span class='ident'>Json</span>::<span class='ident'>from_str</span>(<span class='string'>r##&quot;{&quot;hello&quot;: &quot;hi&quot;}&quot;##</span>).<span class='ident'>unwrap</span>();
+
+<span class='kw'>if</span> <span class='kw'>let</span> <span class='prelude-val'>Ok</span>(<span class='ident'>template</span>) <span class='op'>=</span> <span class='ident'>Template</span>::<span class='ident'>new</span>(<span class='string'>&quot;{{hello}}&quot;</span>) {
+  <span class='kw'>let</span> <span class='ident'>res</span> <span class='op'>=</span> <span class='ident'>template</span>.<span class='ident'>eval_to_string</span>(<span class='kw-2'>&amp;</span><span class='ident'>data</span>).<span class='ident'>unwrap_or</span>(<span class='string'>&quot;&quot;</span>.<span class='ident'>to_string</span>());
+  <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='kw-2'>&amp;</span><span class='ident'>res</span>, <span class='string'>&quot;hi&quot;</span>);
+}
+</pre>
+
+<p>For template parsing, you can also use rust&#39;s usual patterns that leverage type inference :</p>
+<pre class='rust rust-example-rendered'>
+<span class='kw'>use</span> <span class='ident'>rumblebars</span>::<span class='ident'>Template</span>;
+<span class='kw'>let</span> <span class='ident'>template</span>: <span class='ident'>Template</span> <span class='op'>=</span> <span class='string'>&quot;{{hello}}&quot;</span>.<span class='ident'>parse</span>().<span class='ident'>unwrap</span>(); <span class='comment'>// thanks to FromStr</span>
+</pre>
+
+<p>You can just call the <code>parse()</code> function too :</p>
+<pre class='rust rust-example-rendered'>
+<span class='ident'>rumblebars</span>::<span class='ident'>parse</span>(<span class='string'>&quot;{{hello}}&quot;</span>).<span class='ident'>unwrap</span>();
+</pre>
+
+<p>Same with <code>eval()</code> :</p>
+<pre class='rust rust-example-rendered'>
+<span class='kw'>extern</span> <span class='kw'>crate</span> <span class='ident'>rustc_serialize</span> <span class='kw'>as</span> <span class='ident'>serialize</span>;
+<span class='kw'>extern</span> <span class='kw'>crate</span> <span class='ident'>rumblebars</span>;
+<span class='kw'>use</span> <span class='ident'>serialize</span>::<span class='ident'>json</span>::<span class='ident'>Json</span>;
+<span class='kw'>use</span> <span class='ident'>rumblebars</span>::{<span class='ident'>EvalContext</span>};
+
+<span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>out</span> <span class='op'>=</span> <span class='ident'>Vec</span>::<span class='ident'>new</span>();
+<span class='ident'>rumblebars</span>::<span class='ident'>eval</span>(<span class='kw-2'>&amp;</span><span class='ident'>rumblebars</span>::<span class='ident'>parse</span>(<span class='string'>&quot;{{hello}}&quot;</span>).<span class='ident'>unwrap</span>(), <span class='kw-2'>&amp;</span><span class='ident'>Json</span>::<span class='ident'>Null</span>, <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>out</span>, <span class='kw-2'>&amp;</span><span class='ident'>EvalContext</span>::<span class='ident'>new</span>());
+</pre>
+
+<h2 id="helpers" class='section-header'><a
+                           href="#helpers">helpers</a></h2>
+<p>Helpers are registered to the evaluation context. They are boxed closures (you can hold bare function in them too) that have to write their content on the <code>out: &amp;mut Writer</code>. If you need to processed content before rendering it to the final <code>Writer</code>, just render it to a buffer put into a safe writter.</p>
+
+<p>To use your hepler you just have to register it before evaluating your template:</p>
+
+<p>You can control the EvalContext (for custom helpers) and output using <code>eval()</code></p>
+<pre class='rust rust-example-rendered'>
+<span class='kw'>use</span> <span class='ident'>rumblebars</span>::{<span class='ident'>Template</span>, <span class='ident'>HBData</span>, <span class='ident'>EvalContext</span>};
+
+<span class='kw'>if</span> <span class='kw'>let</span> <span class='prelude-val'>Ok</span>(<span class='ident'>template</span>) <span class='op'>=</span> <span class='ident'>Template</span>::<span class='ident'>new</span>(<span class='string'>&quot;{{hello}}&quot;</span>) {
+  <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>context</span> <span class='op'>=</span> <span class='ident'>EvalContext</span>::<span class='ident'>new</span>();
+  <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>buf</span> <span class='op'>=</span> <span class='ident'>Vec</span>::<span class='ident'>new</span>();
+
+  <span class='ident'>context</span>.<span class='ident'>register_helper</span>(<span class='string'>&quot;hello&quot;</span>.<span class='ident'>to_string</span>(), <span class='ident'>Box</span>::<span class='ident'>new</span>(
+    <span class='op'>|</span><span class='ident'>params</span>, <span class='ident'>options</span>, <span class='ident'>out</span>, <span class='ident'>hb_context</span><span class='op'>|</span> {
+      <span class='string'>&quot;hi&quot;</span>.<span class='ident'>write_value</span>(<span class='ident'>out</span>)
+  }));
+
+  <span class='kw'>if</span> <span class='kw'>let</span> <span class='prelude-val'>Ok</span>(_) <span class='op'>=</span> <span class='ident'>template</span>.<span class='ident'>eval</span>(<span class='kw-2'>&amp;</span><span class='string'>&quot;&quot;</span>, <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>buf</span>, <span class='kw-2'>&amp;</span><span class='ident'>context</span>) {
+     <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>String</span>::<span class='ident'>from_utf8_lossy</span>(<span class='kw-2'>&amp;</span><span class='ident'>buf</span>), <span class='string'>&quot;hi&quot;</span>);
+  }
+}
+</pre>
 </div><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
 <table>
                     <tr class=' module-item'>
@@ -55,6 +138,16 @@ to use with rust nighly feature build with <code>cargo build --features nightly 
                                title='rumblebars::EvalContext'>EvalContext</a></td>
                         <td class='docblock short'>
                              <p>Stores partials, helpers and configuration flags</p>
+
+                        </td>
+                    </tr>
+                
+                    <tr class=' module-item'>
+                        <td><a class='struct' href='struct.HTMLSafeWriter.html'
+                               title='rumblebars::HTMLSafeWriter'>HTMLSafeWriter</a></td>
+                        <td class='docblock short'>
+                             <p>This writer implementation wraps a Writer and
+will escape all unsafe html characters</p>
 
                         </td>
                     </tr>
@@ -89,7 +182,11 @@ to use with rust nighly feature build with <code>cargo build --features nightly 
                         <td><a class='enum' href='enum.SafeWriting.html'
                                title='rumblebars::SafeWriting'>SafeWriting</a></td>
                         <td class='docblock short'>
-                             
+                             <p>Enum that holds either a writer or a wrapped writer, this
+is needed to opt-out filtering easily, so rumblebar uses <code>SafeWriting</code> 
+to make use of <code>into_safe()</code> mostly transparent and stateless, while
+enforcing safe writing through the api.</p>
+
                         </td>
                     </tr>
                 </table><h2 id='traits' class='section-header'><a href="#traits">Traits</a></h2>
@@ -107,7 +204,8 @@ to use with rust nighly feature build with <code>cargo build --features nightly 
                         <td><a class='fn' href='fn.eval.html'
                                title='rumblebars::eval'>eval</a></td>
                         <td class='docblock short'>
-                             
+                             <p>Global function for template evaluation. See <a href="struct.Template.html"><code>Template</code></a> docs.</p>
+
                         </td>
                     </tr>
                 
