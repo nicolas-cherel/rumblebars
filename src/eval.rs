@@ -148,12 +148,52 @@ impl <'a> io::Write for IndentWriter<'a> {
   }
 }
 
+/// Enum that holds either a writer or a wrapped writer, this
+/// is needed to opt-out filtering easily, so rumblebar uses `SafeWriting`
+/// to make use of `into_safe()` mostly transparent and stateless, while
+/// enforcing safe writing through the api.
+///
+/// Typically, the wrapped writer will filter unsafe string/characters.
+///
+/// # Examples
+///
+/// Simple html escaping and unsafe support :
+///
+/// ```
+/// use std::io::Write;
+/// use rumblebars::SafeWriting;
+/// let mut buf = Vec::new();
+///
+/// SafeWriting::with_html_safe_writer(&mut buf, &|out| {
+///   out.write_all("<>".as_bytes());
+///   out.into_unsafe().write_all("<>".as_bytes())
+/// });
+///
+/// assert_eq!(String::from_utf8(buf).unwrap(), "&lt;&gt;<>")
+/// ```
+/// Double escaping will work as expected :
+///
+/// ```
+/// use std::io::Write;
+/// use rumblebars::HTMLSafeWriter;
+/// use rumblebars::SafeWriting;
+/// let mut buf = Vec::new();
+/// {
+///   let mut esc1 = HTMLSafeWriter::new(&mut buf);
+///   SafeWriting::with_html_safe_writer(&mut esc1, &|out| {
+///     out.write_all("<>".as_bytes())
+///   });
+/// }
+///
+/// assert_eq!(String::from_utf8(buf).unwrap(), "&amp;lt;&amp;gt;")
+/// ```
 pub enum SafeWriting<'a> {
   Safe(&'a mut (SafeWriter +'a)),
   Unsafe(&'a mut (io::Write +'a)),
 }
 
 impl <'a> SafeWriting<'a> {
+  /// disclose the unsafe writer without touching self
   pub fn into_unsafe(&mut self) -> SafeWriting {
     match self {
       &mut SafeWriting::Safe(ref mut w) => SafeWriting::Unsafe(w.writer()),
@@ -161,6 +201,7 @@ impl <'a> SafeWriting<'a> {
     }
   }
 
+  /// quick way to get a SafeWriter that escapes html
   pub fn with_html_safe_writer(out: &mut io::Write, safe: &Fn(&mut SafeWriting) -> HBEvalResult) -> HBEvalResult {
     let mut html_safe = HTMLSafeWriter::new(out);
     safe(&mut SafeWriting::Safe(&mut html_safe))
@@ -187,13 +228,14 @@ pub trait SafeWriter: io::Write {
   fn writer(&mut self) -> &mut io::Write;
 }
 
-
+/// This writer implementation wraps a Writer and
+/// will escape all unsafe html characters
 pub struct HTMLSafeWriter<'a> {
   w: &'a mut (io::Write + 'a)
 }
 
 impl <'a> HTMLSafeWriter<'a> {
-  fn new(writer: &'a mut (io::Write + 'a)) -> HTMLSafeWriter {
+  pub fn new(writer: &'a mut (io::Write + 'a)) -> HTMLSafeWriter {
     HTMLSafeWriter {
       w: writer
     }
@@ -254,6 +296,7 @@ pub type HBIter<'a> = Box<Iterator<Item = (&'a str, &'a (HBData + 'a))> + 'a>;
 
 pub trait HBData  {
   fn write_value(&self, out: &mut SafeWriting) -> HBEvalResult;
+
   fn typed_node(&self) -> HBNodeType<&HBData>;
   fn get_key(&self, key: &str) -> Option<&HBData>;
   fn as_bool(&self) -> bool;
@@ -723,6 +766,50 @@ impl Default for EvalContext {
   }
 }
 
+/// Holds the partials and helpers available for the template expansion.
+///
+/// # Examples
+///
+/// Add partial to make it available on expansion :
+///
+/// ```
+/// # extern crate rustc_serialize as serialize;
+/// # extern crate rumblebars;
+/// # fn main() {
+/// use rumblebars::Template;
+/// use rumblebars::EvalContext;
+/// # use serialize::json::Json;
+///
+/// let mut context = EvalContext::new();
+/// # let mut say_hi = String::new();
+/// # let sample: Json = r##"{"hello": "hi"}"##.parse().unwrap();
+/// # let mut buf = say_hi.into_bytes();
+///
+/// context.register_partial("greet".to_string(), "say {{hello}}".parse().unwrap());
+/// #
+/// # Template::new("{{>greet}}").unwrap().eval(&sample, &mut buf, &context).unwrap();
+/// #
+/// # say_hi = String::from_utf8(buf).unwrap();
+/// #
+/// # assert_eq!(say_hi, "say hi")
+/// # }
+/// ```
+///
+/// Helpers uses the same logic as partials, you register it into the evaluation
+/// context, and it'll be available on all expansion.
+///
+/// ```
+/// use rumblebars::EvalContext;
+/// use rumblebars::HBData; // for write_value
+///
+/// let mut context = EvalContext::new();
+///
+/// context.register_helper("hello".to_string(), Box::new(
+///   |params, options, out, hb_context| {
+///     "hi".write_value(out)
+/// }));
+/// ```
+///
 impl EvalContext {
   /// just return a default EvalContext without having to declare use of std:default
   pub fn new() -> EvalContext {
@@ -735,30 +822,6 @@ impl EvalContext {
   }
 
   /// adds a partial in the evaluation context
-  ///
-  /// # Examples
-  /// ```
-  /// # extern crate rustc_serialize as serialize;
-  /// # extern crate rumblebars;
-  /// # fn main() {
-  /// use rumblebars::Template;
-  /// use rumblebars::EvalContext;
-  /// use serialize::json::Json;
-  ///
-  /// let mut context = EvalContext::new();
-  /// let mut say_hi = String::new();
-  /// let sample: Json = r##"{"hello": "hi"}"##.parse().unwrap();
-  /// let mut buf = say_hi.into_bytes();
-  ///
-  /// context.register_partial("greet".to_string(), "say {{hello}}".parse().unwrap());
-  ///
-  /// Template::new("{{>greet}}").unwrap().eval(&sample, &mut buf, &context).unwrap();
-  ///
-  /// say_hi = String::from_utf8(buf).unwrap();
-  ///
-  /// assert_eq!(say_hi, "say hi")
-  /// # }
-  /// ```
   pub fn register_partial(&mut self, name: String, t: Template) {
     self.partials.insert(name, t);
   }
@@ -770,18 +833,6 @@ impl EvalContext {
 
 
   /// adds a helper to the evaluation context
-  ///
-  /// ```
-  /// use rumblebars::EvalContext;
-  /// use rumblebars::HBData; // for write_value
-  ///
-  /// let mut context = EvalContext::new();
-  ///
-  /// context.register_helper("hello".to_string(), Box::new(
-  ///   |params, options, out, hb_context| {
-  ///     "hi".write_value(out)
-  /// }));
-  /// ```
   pub fn register_helper(&mut self, name: String, h: HelperFunction) {
     self.helpers.insert(name, Helper::new_with_function(h));
   }
@@ -797,6 +848,7 @@ impl EvalContext {
   }
 }
 
+/// Global function for template evaluation. See [`Template`](struct.Template.html) docs.
 pub fn eval(template: &Template, data: &HBData, out: &mut io::Write, eval_context: &EvalContext) -> HBEvalResult {
   let log = "info".to_string();
   let mut globals = HashMap::new();

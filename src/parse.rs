@@ -298,61 +298,7 @@ use super::{HBData, HBEvalResult, EvalContext, eval};
 /// processed by [`::rumblebars::parse()`](fn.parse.html) and
 /// [`::rumblebars::eval()`](fn.eval.html).
 ///
-/// # Examples
-///
-/// The API shortcuts are provided by object oriented
-/// code design.
-///
-/// You can render directly into a String :
-///
-/// ```
-/// extern crate rustc_serialize as serialize;
-/// extern crate rumblebars;
-/// # fn main() {
-/// use serialize::json::Json;
-/// use rumblebars::Template;
-///
-/// let data = Json::from_str(r##"{"hello": "hi"}"##).unwrap();
-///
-/// if let Ok(template) = Template::new("{{hello}}") {
-///   let res = template.eval_to_string(&data).unwrap_or("".to_string());
-///   assert_eq!(&res, "hi");
-/// }
-/// # else { panic!("should not reach") }
-/// # }
-/// ```
-///
-/// For template parsing, you can also use rust's usual patterns that leverage type inference :
-///
-/// ```
-/// use rumblebars::Template;
-/// let template: Template = "{{hello}}".parse().unwrap(); // thanks to FromStr
-/// ```
-///
-/// You can control the EvalContext (for custom helpers) and output using `eval()`
-///
-/// ```
-/// use rumblebars::Template;
-/// use rumblebars::HBData;
-/// use rumblebars::EvalContext;
-///
-/// if let Ok(template) = Template::new("{{hello}}") {
-///   let mut context = EvalContext::new();
-///   let mut buf = Vec::new();
-///
-///   context.register_helper("hello".to_string(), Box::new(
-///     |params, options, out, hb_context| {
-///       "hi".write_value(out)
-///   }));
-///
-///   if let Ok(_) = template.eval(&"", &mut buf, &context) {
-///      assert_eq!(String::from_utf8_lossy(&buf), "hi");
-///   }
-/// }
-/// # else { panic!("should not reach") }
-/// ```
-
-
+/// (see crate docs)
 
 pub struct Template {
   pub entries: Entries
