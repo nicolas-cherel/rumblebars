@@ -91,13 +91,13 @@ pub enum HBNodeType<T> {
 }
 
 struct IndentWriter<'a> {
-  w: &'a mut SafeWriting<'a>,
+  w: &'a mut (io::Write+'a),
   indent: Option<String>,
 }
 
 impl <'a> IndentWriter<'a> {
   fn with_indent(s: Option<String>, out: &mut SafeWriting, funkt: &Fn(&mut SafeWriting) -> io::Result<()>) -> io::Result<()> {
-    let mut indenter = IndentWriter {w: unsafe { ::std::mem::transmute(out) }, indent: s};
+    let mut indenter = IndentWriter {w: out, indent: s};
     let mut safe = SafeWriting::Unsafe(&mut indenter);
     funkt(&mut safe)
   }
