@@ -861,8 +861,44 @@ pub fn eval(template: &Template, data: &HBData, out: &mut io::Write, eval_contex
   eval_with_globals(&template.entries, data, &mut safe_writer, eval_context, &globals, &vec![data], None)
 }
 
-pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(entries: &'a Entries, data: &'a HBData, out: &mut SafeWriting, eval_context: &'a EvalContext, global_data: &HashMap<&str, &'c HBData>, context_stack: &Vec<&'b HBData>, indent: Option<String>) -> HBEvalResult {
+struct RenderEntry<'a> {
+  entry: &'a Box<HBEntry>,
+  data: &'a (HBData+'a),
+  stack: Vec<&'a (HBData+'a)>,
+  indent: Option<String>,
+}
 
+impl<'a> RenderEntry<'a> {
+  fn new(
+    entry: &'a Box<HBEntry>,
+    data: &'a (HBData+'a),
+    stack: Vec<&'a (HBData+'a)>, indent: Option<String>
+  ) -> RenderEntry<'a> {
+    RenderEntry {
+      entry: entry,
+      data: data,
+      stack: stack,
+      indent: indent,
+    }
+  }
+}
+
+struct IterationControl<'a> {
+  entries: &'a Entries,
+  data_iter: ::std::rc::Rc<::std::cell::RefCell<HBValuesIter<'a>>>,
+  stack: Vec<&'a (HBData+'a)>,
+  indent: Option<String>,
+}
+
+enum StackEntry<'a> {
+  CleanUpPartialContext(usize),
+  ContextIterControlPoint(IterationControl<'a>),
+  FlowEntry(RenderEntry<'a>)
+}
+
+
+pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(entries: &'a Entries, data: &'a HBData, out: &mut SafeWriting, eval_context: &'a EvalContext, global_data: &HashMap<&str, &'c HBData>, context_stack: &Vec<&'b HBData>, indent: Option<String>) -> HBEvalResult {
+  use self::StackEntry::{FlowEntry, ContextIterControlPoint, CleanUpPartialContext};
   // evaluation is done by iterating through each HBEntry to evaluate
   //  - raw copy,
   //  - simple expression evaluation (render value execute helper call)
@@ -875,203 +911,257 @@ pub fn eval_with_globals<'a: 'b, 'b: 'c, 'c>(entries: &'a Entries, data: &'a HBD
   //  - a ref to their associated context
   //  - a context stack, to have access of context of parent blocks (copied for each entry)
   //  - an indentation level (for partials, copied for each entry)
-  let mut stack:Vec<_> = entries.iter().rev().map(|e| {
-    (e, data, context_stack.iter().map(|s| *s).collect::<Vec<_>>(), indent.clone())
-  }).collect();
+  let mut stack = entries.iter().rev().map(|e| {
+    FlowEntry(RenderEntry::new(
+      e, data,
+      context_stack.iter().map(|s| *s).collect::<Vec<_>>(),
+      indent.clone()
+    ))
+  }).collect::<Vec<_>>();
 
   // used for storage of partials optional keys, computed at evaluation
   // this can leak, but probably not in relevant cases.
-  let mut partial_options_contexts = vec![];
+  let mut partial_options_current_index = 0;
+  let mut partial_options_contexts = HashMap::<usize, FallbackToOptions>::new();
 
   while stack.len() > 0 {
-    let w_ok = if let Some((ref templ, ref ctxt, ref ctxt_stack, ref indent)) = stack.pop() {
-      match ***templ {
-        HBEntry::Raw(ref s) => {
-          IndentWriter::with_indent(indent.clone(), &mut out.into_unsafe(), &|w| {
-            w.write_all(&s.as_bytes())
-          })
+    let w_ok = if let Some(stack_entry) = stack.pop() {
+      match stack_entry {
+        CleanUpPartialContext(ref index) => { partial_options_contexts.remove(index); Ok(()) },
+        ContextIterControlPoint(ref control) => if let Some(next) = control.data_iter.borrow_mut().next() {
+          stack.push(ContextIterControlPoint(IterationControl {
+            entries: control.entries,
+            data_iter: control.data_iter.clone(),
+            stack: control.stack.clone(),
+            indent: control.indent.clone(),
+          }));
+          for e in control.entries.iter().rev() {
+            stack.push(FlowEntry(RenderEntry::new(
+              &e, next,
+              control.stack.clone(), control.indent.clone()
+            )));
+          }
+          Ok(())
+        } else {
+          Ok(())
         },
-        HBEntry::Partial(ref exp) => {
-          match exp.base.first() {
-            Some(ref single) if exp.base.len() == 1 => {
-              match eval_context.partial_with_name(&single) {
-                Some(t) => {
-                  let c_ctxt = if let Some(&HBValHolder::Path(ref p)) = exp.params.get(0) {
-                    value_for_key_path_in_context(*ctxt, p, &ctxt_stack, global_data, eval_context.compat).unwrap_or(*ctxt)
-                  } else {
-                    *ctxt
-                  };
+        FlowEntry(flow_entry) => {
+          let ctxt = flow_entry.data;
 
-                  let with_options_fallback = if exp.options.len() > 0 {
-                    let mut options_contexts: HashMap<&str, &HBData> = HashMap::new();
-                    for o in exp.options.iter() {
-                      match o {
-                        &(ref name, HBValHolder::String(ref s)) => {
-                          options_contexts.insert(&name, s as &HBData);
+          match **flow_entry.entry {
+            HBEntry::Raw(ref s) => {
+              IndentWriter::with_indent(flow_entry.indent.clone(), &mut out.into_unsafe(), &|w| {
+                w.write_all(&s.as_bytes())
+              })
+            },
+            HBEntry::Partial(ref exp) => {
+              match exp.base.first() {
+                Some(ref single) if exp.base.len() == 1 => {
+                  match eval_context.partial_with_name(&single) {
+                    Some(ref t) => {
+                      let c_ctxt = if let Some(&HBValHolder::Path(ref p)) = exp.params.get(0) {
+                        value_for_key_path_in_context(ctxt, p, &flow_entry.stack, global_data, eval_context.compat).unwrap_or(ctxt)
+                      } else {
+                        ctxt
+                      };
+
+                      let with_options_fallback = if exp.options.len() > 0 {
+                        let mut options_contexts: HashMap<&str, &HBData> = HashMap::new();
+                        for o in exp.options.iter() {
+                          match o {
+                            &(ref name, HBValHolder::String(ref s)) => {
+                              options_contexts.insert(&name, s as &HBData);
+                            },
+                            &(ref name, HBValHolder::Path(ref p)) => {
+                              options_contexts.insert(&name, value_for_key_path_in_context(ctxt, p, &flow_entry.stack, global_data, eval_context.compat).unwrap_or(&eval_context.falsy));
+                            },
+                            &(ref name, HBValHolder::Literal(ref j, _)) => {
+                              options_contexts.insert(&name, j as &HBData);
+                            },
+                          }
+                        }
+
+                        // store data into a collections with enough lifetime, transmute is safe
+                        // because, while partial_options_contexts is mangled with data
+                        // with a greater lifetime, it'll never be accessed
+                        // outside it's current scope
+                        partial_options_contexts.insert(
+                          partial_options_current_index,
+                          FallbackToOptions { data: c_ctxt, options: options_contexts }
+                        );
+                        unsafe { ::std::mem::transmute(
+                          partial_options_contexts.get(&partial_options_current_index).map(|f| f as &HBData).unwrap()
+                        ) }
+                      } else {
+                        c_ctxt
+                      };
+
+                      // calculate indentation content
+                      let may_indent = match (&flow_entry.indent, &exp.render_options.indent) {
+                        (&None, & ref i @ Some(_)) | (& ref i @ Some(_), &None) => i.clone(),
+                        (&Some(ref i), &Some(ref j)) => Some(format!("{}{}", i, j)),
+                        (&None, &None) => None,
+                      };
+
+                      stack.push(CleanUpPartialContext(partial_options_current_index));
+                      partial_options_current_index += 1;
+
+                      for ref e in t.entries.iter().rev() {
+                        stack.push(FlowEntry(RenderEntry::new(
+                          e, with_options_fallback,
+                          flow_entry.stack.clone(), may_indent.clone()
+                        )))
+                      }
+
+                      Ok(())
+                    },
+                    _ => Ok(())
+                  }
+                }
+                Some(_) => panic!("invalid partial name '{}'", exp.path()),
+                None => panic!("invalid empty string to retrieve partial by name"),
+              }
+            },
+
+            HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref render_options, block: None, else_block: None}) => {
+              match (base.first(), base.len()) {
+                (Some(ref single), 1) if eval_context.has_helper_with_name(&single) => {
+                  let helper = eval_context.helper_with_name(&single).unwrap();
+                  if render_options.escape {
+                    IndentWriter::with_indent(flow_entry.indent.clone(), out, &|w| {
+                      helper.call_fn(ctxt, &params, &options, w, eval_context, &flow_entry.stack, global_data)
+                    })
+                  } else {
+                    IndentWriter::with_indent(flow_entry.indent.clone(), &mut out.into_unsafe(), &|w| {
+                      helper.call_fn(ctxt, &params, &options, w, eval_context, &flow_entry.stack, global_data)
+                    })
+                  }
+                },
+                _ => match value_for_key_path_in_context(ctxt, base, &flow_entry.stack, global_data, eval_context.compat) {
+                  Some(v) => match v.typed_node() {
+                    HBNodeType::Leaf(_) | HBNodeType::Array(_)=> {
+                      if render_options.escape {
+                        IndentWriter::with_indent(flow_entry.indent.clone(), out, &|w| {
+                          v.write_value(w)
+                        })
+                      } else {
+                        IndentWriter::with_indent(flow_entry.indent.clone(), &mut out.into_unsafe(), &|w| {
+                          v.write_value(w)
+                        })
+                      }
+                    },
+                    _ => Ok(()),
+                  },
+                  None => Ok(()),
+                }
+              }
+            },
+
+            HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref render_options, ref block, ref else_block}) => {
+              render_options.escape; // only suppress unused warning
+              match (base.first(), base.len()) {
+                (Some(ref single), 1) if eval_context.has_helper_with_name(&single) => {
+                  let helper = eval_context.helper_with_name(&single).unwrap();
+
+                  // collect options of deref'd blocks
+                  let blocks: Vec<_> = [block, else_block].iter().map(|b| {
+                    match b {
+                      &&Some(ref t) => Some(&**t),
+                      &&None => None,
+                    }
+                  }).collect();
+
+                  if let (Some(&opt_block), Some(&opt_else_block), 2) = (blocks.first(), blocks.get(1), blocks.len()) {
+                    helper.call_for_block(
+                      opt_block,
+                      opt_else_block,
+                      render_options.inverse,
+                      ctxt,
+                      &params,
+                      &options,
+                      out,
+                      eval_context,
+                      &flow_entry.stack,
+                      global_data
+                    )
+                  } else {
+                    Ok(())
+                  }
+                },
+                _ => {
+                  let c_ctxt = value_for_key_path_in_context(ctxt, base, &flow_entry.stack, global_data, eval_context.compat);
+
+                  match (c_ctxt.unwrap_or(&eval_context.falsy), block) {
+                    (c, &Some(ref block_found)) => {
+                      match c.typed_node() {
+                        HBNodeType::Branch(_) | HBNodeType::Leaf(_) | HBNodeType::Null => {
+                          if c.as_bool() && !render_options.inverse || !c.as_bool() && render_options.inverse {
+                            for e in block_found.iter().rev() {
+                              let mut c_stack = flow_entry.stack.clone();
+                              c_stack.push(ctxt);
+                              stack.push(FlowEntry(RenderEntry::new(
+                                e, c,
+                                c_stack, flow_entry.indent.clone()
+                              )))
+                            }
+                          } else if let &Some(ref inv_block) = else_block {
+                            for e in inv_block.iter().rev() {
+                              stack.push(FlowEntry(RenderEntry::new(
+                                e, ctxt,
+                                flow_entry.stack.clone(), flow_entry.indent.clone()
+                              )))
+                            }
+                          }
                         },
-                        &(ref name, HBValHolder::Path(ref p)) => {
-                          options_contexts.insert(&name, value_for_key_path_in_context(*ctxt, p, &ctxt_stack, global_data, eval_context.compat).unwrap_or(&eval_context.falsy));
-                        },
-                        &(ref name, HBValHolder::Literal(ref j, _)) => {
-                          options_contexts.insert(&name, j as &HBData);
+                        HBNodeType::Array(_) => {
+                          let inverse = render_options.inverse;
+                          let (len, _) = c.values().size_hint();
+
+                          let collection_iter: HBValuesIter = match (0 >= len, inverse) {
+                            (true,  true)  => Box::new(Some(&eval_context.falsy as &HBData).into_iter()),
+                            (false, true)  => Box::new(None.into_iter()),
+                            (_, false) => c.values(),
+                          };
+
+                          let (c_len, _) = collection_iter.size_hint();
+
+                          let iter_cell = ::std::rc::Rc::new(::std::cell::RefCell::new(collection_iter));
+
+                          if c_len > 0 {
+                            let mut c_stack = flow_entry.stack.clone();
+                            c_stack.push(ctxt);
+
+                            stack.push(ContextIterControlPoint(IterationControl {
+                              entries: block_found,
+                              data_iter: iter_cell.clone(),
+                              stack: c_stack,
+                              indent: flow_entry.indent.clone()
+                            }));
+                          } else if let &Some(ref inv_block) = else_block {
+                            for e in inv_block.iter().rev() {
+                              stack.push(FlowEntry(RenderEntry::new(
+                                e, ctxt,
+                                flow_entry.stack.clone(), flow_entry.indent.clone()
+                              )))
+                            }
+                          }
+
                         },
                       }
-                    }
-
-                    // store data into a collections with enough lifetime, with need of a known safe transmute
-                    partial_options_contexts.push(FallbackToOptions { data: c_ctxt, options: options_contexts });
-                    unsafe { ::std::mem::transmute(partial_options_contexts.last().map(|f| f as &HBData)) }
-                  } else {
-                    None
-                  };
-
-                  // calculate indentation content
-                  let may_indent = match (indent, &exp.render_options.indent) {
-                    (&None, ref i @ &Some(_)) | (ref i @ &Some(_), &None) => (*i).clone(),
-                    (&Some(ref i), &Some(ref j)) => Some(format!("{}{}", i, j)),
-                    (&None, &None) => None,
-                  };
-
-                  for e in t.entries.iter().rev() {
-                    let mut c_stack = ctxt_stack.clone();
-                    c_stack.push(*ctxt);
-                    stack.push((e, with_options_fallback.unwrap_or(c_ctxt), c_stack, may_indent.clone()));
+                    },
+                    _ => (),
                   }
 
                   Ok(())
                 },
-                _ => Ok(())
               }
             }
-            Some(_) => panic!("invalid partial name '{}'", exp.path()),
-            None => panic!("invalid empty string to retrieve partial by name"),
           }
-        },
-
-        HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref render_options, block: None, else_block: None}) => {
-          match (base.first(), base.len()) {
-            (Some(ref single), 1) if eval_context.has_helper_with_name(&single) => {
-              let helper = eval_context.helper_with_name(&single).unwrap();
-              if render_options.escape {
-                IndentWriter::with_indent(indent.clone(), out, &|w| {
-                  helper.call_fn(*ctxt, &params, &options, w, eval_context, &ctxt_stack, global_data)
-                })
-              } else {
-                IndentWriter::with_indent(indent.clone(), &mut out.into_unsafe(), &|w| {
-                  helper.call_fn(*ctxt, &params, &options, w, eval_context, &ctxt_stack, global_data)
-                })
-              }
-            },
-            _ => match value_for_key_path_in_context(*ctxt, base, &ctxt_stack, global_data, eval_context.compat) {
-              Some(v) => match v.typed_node() {
-                HBNodeType::Leaf(_) | HBNodeType::Array(_)=> {
-                  if render_options.escape {
-                    IndentWriter::with_indent(indent.clone(), out, &|w| {
-                      v.write_value(w)
-                    })
-                  } else {
-                    IndentWriter::with_indent(indent.clone(), &mut out.into_unsafe(), &|w| {
-                      v.write_value(w)
-                    })
-                  }
-                },
-                _ => Ok(()),
-              },
-              None => Ok(()),
-            }
-          }
-        },
-
-        HBEntry::Eval(HBExpression{ref base, ref params, ref options, ref render_options, ref block, ref else_block}) => {
-          render_options.escape; // only suppress unused warning
-          match (base.first(), base.len()) {
-            (Some(ref single), 1) if eval_context.has_helper_with_name(&single) => {
-              let helper = eval_context.helper_with_name(&single).unwrap();
-
-              // collect options of deref'd blocks
-              let blocks: Vec<_> = [block, else_block].iter().map(|b| {
-                match b {
-                  &&Some(ref t) => Some(&**t),
-                  &&None => None,
-                }
-              }).collect();
-
-              if let (Some(&opt_block), Some(&opt_else_block), 2) = (blocks.first(), blocks.get(1), blocks.len()) {
-                helper.call_for_block(
-                  opt_block,
-                  opt_else_block,
-                  render_options.inverse,
-                  *ctxt,
-                  &params,
-                  &options,
-                  out,
-                  eval_context,
-                  &ctxt_stack,
-                  global_data
-                )
-              } else {
-                Ok(())
-              }
-            },
-            _ => {
-              let c_ctxt = value_for_key_path_in_context(*ctxt, base, &ctxt_stack, global_data, eval_context.compat);
-
-              match (c_ctxt.unwrap_or(&eval_context.falsy), block) {
-                (c, &Some(ref block_found)) => {
-                  match c.typed_node() {
-                    HBNodeType::Branch(_) | HBNodeType::Leaf(_) | HBNodeType::Null => {
-                      if c.as_bool() && !render_options.inverse || !c.as_bool() && render_options.inverse {
-                        for e in block_found.iter().rev() {
-                          let mut c_stack = ctxt_stack.clone();
-                          c_stack.push(*ctxt);
-                          stack.push((e, c, c_stack, indent.clone()));
-                        }
-                      } else if let &Some(ref inv_block) = else_block {
-                        for e in inv_block.iter().rev() {
-                          stack.push((e, *ctxt, ctxt_stack.clone(), indent.clone()));
-                        }
-                      }
-                    },
-                    HBNodeType::Array(_) => {
-                      let inverse = render_options.inverse;
-                      let (len, _) = c.values().size_hint();
-
-                      let collection_iter: HBValuesIter = match (0 >= len, inverse) {
-                        (true,  true)  => Box::new(Some(&eval_context.falsy as &HBData).into_iter()),
-                        (false, true)  => Box::new(None.into_iter()),
-                        (_, false) => c.values(),
-                      };
-
-                      let (c_len, _) = collection_iter.size_hint();
-
-                      if c_len > 0 {
-                        for array_i in collection_iter.collect::<Vec<_>>().iter().rev() {
-                          for e in block_found.iter().rev() {
-                            let mut c_stack = ctxt_stack.clone();
-                            c_stack.push(*ctxt);
-                            stack.push((e, *array_i, c_stack, indent.clone()));
-                          }
-                        }
-                      } else if let &Some(ref inv_block) = else_block {
-                        for e in inv_block.iter().rev() {
-                          stack.push((e, *ctxt, ctxt_stack.clone(), indent.clone()));
-                        }
-                      }
-
-                    },
-                  }
-                },
-                _ => ()
-              }
-              Ok(())
-            },
-          }
-        },
+        }
       }
     } else {
       Ok(())
     };
-
     if w_ok.is_err() { return w_ok };
   }
 
