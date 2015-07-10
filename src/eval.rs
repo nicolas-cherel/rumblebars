@@ -563,7 +563,7 @@ impl <'a> HelperOptions<'a> {
 
 
   /// same as lookup, but with custom context instead of current one (this)
-  pub fn lookup_with_context(&self, key: &HBData, context: &HBData) -> Option<&'a (HBData + 'a)>  {
+  pub fn lookup_with_context(&self, key: &HBData, context: &'a (HBData+'a)) -> Option<&'a (HBData + 'a)>  {
     let mut buf:Vec<u8> = vec![];
     let key_write_ok = {
       let mut html_safe = HTMLSafeWriter::new(&mut buf);
@@ -574,7 +574,7 @@ impl <'a> HelperOptions<'a> {
     if key_write_ok.is_ok() {
       if let Ok(str_key) = String::from_utf8(buf) {
         let key_path = HelperOptions::parse_path(&str_key);
-        value_for_key_path_in_context(unsafe { ::std::mem::transmute(context) }, &key_path, self.context_stack, self.global_data, self.hb_context.compat)
+        value_for_key_path_in_context(context, &key_path, self.context_stack, self.global_data, self.hb_context.compat)
       } else {
         None
       }
