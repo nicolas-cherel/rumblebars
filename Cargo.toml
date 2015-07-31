@@ -15,6 +15,8 @@ default     = ["stable"]
 nightly     = ["rustlex"]
 stable      = ["with-syntex"]
 with-syntex = [ "syntex", "rustlex_codegen/with-syntex"]
+stream_test = ["rand", "time"]
+
 
 [build-dependencies]
 rustlex_codegen = { version = "*", optional = true }
@@ -31,6 +33,9 @@ lazy_static     = "*"
 rustlex_codegen = { version = "*", optional = true }
 rustlex         = { version = "*", optional = true }
 syntex          = { version = "*", optional = true }
+
+rand            = { version = "*", optional = true }
+time            = { version = "*", optional = true }
 
 # for dev cycles
 # [dependencies.rustlex]

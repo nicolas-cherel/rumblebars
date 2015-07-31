@@ -1,6 +1,9 @@
 extern crate rumblebars;
 extern crate rustc_serialize as serialize;
 
+#[cfg(feature = "stream_test")] extern crate rand;
+#[cfg(feature = "stream_test")] extern crate time;
+
 mod helpers;
 mod parse;
 
@@ -365,5 +368,142 @@ mod eval {
     assert_eq!(String::from_utf8(buf).unwrap(), "<script lang=\"text/javascript\">pawned()</script>");
   }
 
+}
+
+/// stream testing, run with :
+/// `cargo test stream::test_stream --release  --features stream_test -- --nocapture`
+
+#[cfg(feature = "stream_test")]
+mod stream {
+  use std::io::Write;
+  use std::cell::RefCell;
+
+  use rand;
+  use serialize::json;
+  use serialize::json::Json;
+
+  use rumblebars::Template;
+  use rumblebars::EvalContext;
+  use rumblebars::preludes::hbdata::*;
+
+  struct RandIter<'a, RNG> where RNG: rand::Rng {
+    rng: RNG,
+    total: usize,
+    cell: &'a RefCell<Json>,
+  }
+
+  impl<'a, RNG> Iterator for RandIter<'a, RNG> where RNG: rand::Rng {
+    type Item = &'a HBData;
+
+    fn next(&mut self) -> Option<Self::Item> {
+      if self.total <= 0 { return None }
+
+      self.total -= 1;
+
+      let size = ((self.rng.gen::<u16>() >> 5) + 15) as usize;
+      let key_size = ((self.rng.gen::<u8>() >> 3) + 6) as usize;
+
+      {
+        let mut json_borrow = self.cell.borrow_mut();
+        let mut json = json_borrow.as_object_mut().unwrap();
+        json.clear();
+        for _ in (0..self.rng.gen::<u8>()) {
+          let key = self.rng.gen_ascii_chars().take(key_size).collect();
+          let value = self.rng.gen_ascii_chars().take(size).collect();
+          json.insert(key, Json::String(value));
+        }
+      }
+
+      // borrow returns a Ref on the stack, so its lifetime is to short
+      // but referenced value actually has 'a lifetime.
+      Some(unsafe { ::std::mem::transmute(&*self.cell.borrow() as &HBData) })
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+      (self.total, Some(self.total))
+    }
+  }
+
+  struct Rand {
+    cell: RefCell<Json>,
+    size_limit: usize,
+  }
+
+
+  impl HBData for Rand {
+    fn write_value(&self, out: &mut SafeWriting) -> HBEvalResult {
+      write!(out, "{}", "self")
+    }
+
+    fn typed_node<'a>(&'a self) -> HBNodeType<&'a HBData> {
+      HBNodeType::Array(self as &HBData)
+    }
+
+    fn as_bool(&self) -> bool { true }
+
+    fn get_key<'a>(&'a self, _: &str) -> Option<&'a HBData> { None }
+    fn keys<'a>(&'a self) -> HBKeysIter<'a> { Box::new(None.into_iter()) }
+
+    fn values<'a>(&'a self) -> HBValuesIter<'a> { Box::new(RandIter {
+      cell: &self.cell, total: self.size_limit, rng: rand::weak_rng()
+    } ) }
+
+    fn iter<'a>(&'a self) -> HBIter<'a> { Box::new(None.into_iter()) }
+  }
+
+  struct SenderWriter(::std::sync::mpsc::Sender<Vec<u8>>);
+
+  impl ::std::io::Write for SenderWriter {
+    fn write(&mut self, buf: &[u8]) -> ::std::io::Result<usize> {
+      use std::io::{Error, ErrorKind};
+      try!(self.0.send(buf.to_vec()).map_err(|e| Error::new(ErrorKind::Other, e) ));
+      Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> ::std::io::Result<()> {
+      Ok(())
+    }
+  }
+
+  #[test]
+  fn test_stream() {
+    use std::sync::mpsc::channel;
+    use std::thread;
+
+
+    let (tx, rx) = channel::<Vec<u8>>();
+
+    let h = thread::spawn(move|| {
+        let mut tick = ::time::PreciseTime::now();
+        let mut total_data = 0;
+        let mut acc = 0;
+        for data in rx.iter() {
+          total_data += data.len();
+          acc += data.len();
+
+          let duration = tick.to(::time::PreciseTime::now());
+          if duration.num_seconds() > 0 {
+            println!("{:?}MiB/s", (acc as i64 / duration.num_milliseconds()) as f64 / 1000f64 );
+            acc = 0;
+            tick = ::time::PreciseTime::now();
+          }
+        }
+        println!("total received : {:?}", total_data);
+    });
+
+    let rand_collection = Rand { cell: RefCell::new(Json::Object(json::Object::new())), size_limit: 2000 };
+
+    if let Ok(t) = Template::new("{{#this}}{{#each this}}{{@key}} {{.}}{{/each}}{{/this}}") {
+      println!("total {:?}", ::time::Duration::span(|| {
+        t.eval(&rand_collection, &mut ::std::io::BufWriter::new(SenderWriter(tx)), &EvalContext::new()).ok();
+        // t.eval(&rand_collection, &mut ::std::io::sink(), &EvalContext::new());
+        // t.eval(&rand_collection, &mut ::std::io::stdout(), &EvalContext::new());
+      }));
+
+    }
+
+    h.join().ok();
+
+  }
 }
 
