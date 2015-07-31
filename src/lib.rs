@@ -137,3 +137,13 @@ pub use self::eval::HTMLSafeWriter;
 mod eval;
 mod helpers_builtins;
 
+pub mod preludes {
+  pub mod hbdata {
+    pub use super::super::eval::{HBData, HBIter, HBKeysIter, HBValuesIter, HBEvalResult, HBNodeType, SafeWriting};
+  }
+
+  pub mod helpers {
+    pub use super::super::eval::{EvalContext, HelperOptions, HelperOptionsByName, SafeWriting, HTMLSafeWriter};
+  }
+}
+
