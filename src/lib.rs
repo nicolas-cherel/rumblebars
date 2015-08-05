@@ -100,6 +100,7 @@
 #![crate_name="rumblebars"]
 
 #![cfg_attr(feature = "nightly", feature(test))]
+#![cfg_attr(feature = "nightly", feature(const_fn))]
 #![cfg_attr(feature = "nightly", feature(plugin))]
 #![cfg_attr(feature = "nightly", plugin(rustlex))]
 
