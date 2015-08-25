@@ -1,8 +1,7 @@
 #[cfg(feature = "with-syntex")]
-
 pub fn main() {
     extern crate syntex;
-    extern crate rustlex_codegen;
+    extern crate nc_rustlex_codegen as rustlex_codegen;
     use std::env;
     use std::path::Path;
 
