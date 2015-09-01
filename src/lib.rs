@@ -102,10 +102,10 @@
 #![cfg_attr(feature = "nightly", feature(test))]
 #![cfg_attr(feature = "nightly", feature(const_fn))]
 #![cfg_attr(feature = "nightly", feature(plugin))]
-#![cfg_attr(feature = "nightly", plugin(nc_rustlex))]
+#![cfg_attr(feature = "nightly", plugin(rustlex))]
 
-#[cfg(feature = "with-syntex")] extern crate nc_rustlex_codegen as rustlex;
-#[cfg(feature = "nightly")] #[warn(plugin_as_library)] extern crate nc_rustlex as rustlex;
+#[cfg(feature = "with-syntex")] extern crate rustlex_codegen as rustlex;
+#[cfg(feature = "nightly")] #[warn(plugin_as_library)] extern crate rustlex;
 
 #[cfg(feature = "with-syntex")] mod parse { include!(concat!(env!("OUT_DIR"), "/parse.rs")); }
 #[cfg(feature = "nightly")] mod parse;
